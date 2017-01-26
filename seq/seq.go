@@ -1,5 +1,4 @@
-// Copyright 2017 "as"
-// This program uses the same license as the Go programming language
+// Copyright 2015 "as"
 
 package main
 
@@ -23,7 +22,7 @@ func init() {
 	log.SetFlags(0)
 	log.SetPrefix("seq: ")
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
-	f.StringVar(&args.f, "f", "%d\n", "")
+	f.StringVar(&args.f, "f", `%d\n`, "")
 	f.BoolVar(&args.h, "h", false, "")
 	f.BoolVar(&args.q, "?", false, "")
 
@@ -31,8 +30,11 @@ func init() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if args.h || args.q {
+	if args.h || args.q || len(f.Args()) < 1 {
 		usage()
+		if len(f.Args()) < 1 {
+			os.Exit(1)
+		}
 		os.Exit(0)
 	}
 }
@@ -40,16 +42,22 @@ func init() {
 func main() {
 	a := f.Args()
 	i := atoi(a[0])
-	j := atoi(a[1])
+	j := 0
+	if len(a) > 1 {
+		j = atoi(a[1])
+	} else {
+		j = i
+		i = 0
+	}
 	k := 1
 	if len(a) > 2 {
 		k = atoi(a[2])
 	}
-	fm, err := strconv.Unquote(`"`+args.f+`"`)
-	if err != nil{
-		log.Fatalln("unquote:",err)
+	fm, err := strconv.Unquote(`"` + args.f + `"`)
+	if err != nil {
+		log.Fatalln("unquote:", err)
 	}
-	
+
 	// generate the sequence {i,i+k,...,j}
 	// using format string
 	for ; i <= j; i += k {
@@ -73,9 +81,9 @@ SYNOPSIS
     seq [-f fmt] i j [k]
 
 DESCRIPTION
-    Seq generates the numeric sequence {i, i+j, ..., k}
-    with the given output format. The default format
-    is "%d\n", printing the element followed by a newline.
+    Seq outputs the sequence {i, i+k, ..., j} according
+    to the output format (default "%d\n"). An empty k sets k=1,
+    printing a line seperated list of the numbers i-j inclusive.
 	
 FORMATS
     Types
