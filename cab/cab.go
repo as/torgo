@@ -14,6 +14,10 @@ import (
 	"reflect"
 	"time"
 	"bufio"
+	"strings"
+	"bytes"
+	"log"
+	"io/ioutil"
 )
 
 const (
@@ -43,6 +47,7 @@ func (bf Bitflag) In(b uint16) bool {
 	fmt.Printf("%x\n", b)
 	return b & uint16(bf) != 0
 }
+
 
 type Cab struct {
 	Head
@@ -139,22 +144,24 @@ var (
 )
 
 func (m *MsReader) Read(p []byte) (n int, err error) {
+	fmt.Println("MsReader.Read: Enter\n")
+	defer func(){ fmt.Printf("MsReader.Read: %q\n", p[:n]) }()
 	defer m.zr.Reset(m.br, nil)
 	if n, err = m.br.Read(m.sig[:]); err != nil {
 		return n, err
 	}
 	if m.sig != goodzip {
-		fmt.Printf("not good %#x", m.sig)
-		fmt.Printf("not good %#x", n)
+		fmt.Printf("not good %x", m.sig)
+		fmt.Printf("read %d bytes", n)
 	}
 	
 	// TODO: Bug: wrong n bytes read returned
 	return m.zr.Read(p)
 }
 
-func NewMsReader(i io.Reader) MsReader {
+func NewMsReader(i io.Reader) *MsReader {
 	b := bufio.NewReader(i)
-	return MsReader{
+	return &MsReader{
 		br: b,
 		zr: flate.NewReader(b).(Zipper),
 	}
@@ -174,23 +181,75 @@ func main() {
 	Dump(r.Bloat)
 		fmt.Println("e chatty(Dump(r.Bloat))")
 	fmt.Printf("s %s\n", r.Res)
+	
+	fmt.Println("Reading Dirs")
 	for i := uint16(0); i < r.NDirs; i++ {
 		chatty(r.ReadDir)
 		fmt.Printf("s %#v\nh %#v", r.Dirs, r.Bloat.Dir)
 	}
+	
+	fmt.Println("Reading Fids")
 	for i := uint16(0); i < r.NFids; i++ {
+		fmt.Println("Reading Fids: ", i, "/", r.NFids)
 		chatty(r.ReadFid)
 		Dump(r.Fids[i].HFid)
 		fmt.Printf("s %#s %s\n", r.Fids[i].Name, r.Fids[i].Stamp)
-
 	}
+	
+	fmt.Printf("Cab header: %#v\n", r.Cab)
 
+	fmt.Println("Reading Fid Blocks")
+	plaintext := new(bytes.Buffer)
+	
 	for i, v := range r.Fids {
-		fmt.Printf("fid %d %s\n", i, v.Name)
-		if err := r.ReadBlock(&r.Fids[i]); err != nil {
-			fmt.Println("err", err)
+		name := strings.TrimSpace(strings.Trim(string(v.Name), "\x00"))
+		fmt.Printf("fid %d (%s)\n", i, name)
+		fmt.Println("fid is in dir #", v.DirPos)
+		fmt.Println("fid is at offset #", v.Pos)
+		fmt.Println("fid size ", v.Size)
+		fmt.Printf("dirinfo: %#v\n", r.Dirs[v.DirPos])
+		if v.DirPos >= r.NDirs || v.DirPos < 0{
+			log.Fatalln("bad fid dir: cab total/fid: %d / %d\n", r.NDirs, v.DirPos)
 		}
+		if v.Size < 0{
+			log.Println("fid: %s: bad size: %d\n", name, v.Size)
+		}		
+		block, n, err := decodeblock(plaintext, r)
+		fmt.Printf("block is %#v\n", block)
+		fmt.Printf("size is %d\n", block.size)
+		if n > int64(v.Size){
+			// part of the next file is already in the plaintext buffer
+			log.Println("block contains multiple files")
+		}
+		log.Printf("fid %d %q\n", i, name)
+		log.Printf("file (%d bytes) content %x \n", plaintext.Len(), plaintext.Bytes() )
+		err = ioutil.WriteFile(name, plaintext.Next(int(v.Size)), 0777)
+		if err != nil{
+			log.Fatalln("writefile:", err)
+		}
+		
+		//if err := r.ReadBlock(&r.Fids[i]); err != nil {
+		//	fmt.Println("err", err)
+		//}
 	}
+}
+
+//wire9 block crc[4] size[2] zsize[2] mshdr[2] zdata[size-2]
+
+func decodeblock(dst *bytes.Buffer, r io.Reader) (b *block, n int64, err error){
+	b = &block{}
+	if err = b.ReadBinary(r); err != nil{
+		return b, n, fmt.Errorf("decodeblock: %s", err)
+	}
+	zr := flate.NewReader(bytes.NewReader(b.Bytes()))
+	if n, err = dst.ReadFrom(zr); err != nil{
+		log.Fatalln(err)
+	}
+	return b, n, err
+}
+
+func (b *block) Bytes() []byte{
+	return b.zdata
 }
 
 func NewReader(r io.Reader) *Reader {
@@ -254,14 +313,14 @@ func (r *Reader) ReadBlock(f *Fid) (err error) {
 	//
 	//
 
-	f.Mz = NewMsReader(r)
+	f.Mz = *NewMsReader(r)
 	buf2 := make([]byte, f.Size)
 	Dump(b.HBlock)
 	
 	for i := 0; i < int(f.Size); i++ {
-		n, err := f.Mz.Read(buf2)
+		_, err := f.Mz.Read(buf2)
 		if err != nil {
-			os.Exit(1)
+			return err
 		}
 	}
 	return err
