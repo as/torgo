@@ -1,3 +1,0 @@
-files.txt
-hello.txt
-hello2.txt
