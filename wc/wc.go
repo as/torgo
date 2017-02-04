@@ -90,6 +90,7 @@ func main() {
 		nfiles    int
 		totals  = &tally{name: "totals"}
 		countfn = count
+		donec = make(chan bool)
 	)
 	if args.x {
 		countfn = countx
@@ -108,6 +109,7 @@ func main() {
 			if args.runes {fmt.Printf("%10d",t.runes)}
 			fmt.Printf(" %s\n", t)
 		}
+		donec <- true
 	}()
 	for v := range argfile.Next(f.Args()...) {
 		wg.Add(1)
@@ -130,6 +132,7 @@ func main() {
 		report <- totals
 	}
 	close(report)
+	<- donec
 }
 
 func count(in io.Reader) (*tally, error) {
