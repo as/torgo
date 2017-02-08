@@ -9,7 +9,6 @@ package main
 */
 
 import (
-	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -20,9 +19,10 @@ import (
 	"strings"
 )
 
-import(
+import (
 	"github.com/as/argfile"
 	"github.com/as/mute"
+	"github.com/as/xo"
 )
 
 const (
@@ -53,13 +53,6 @@ var count struct {
 var f *flag.FlagSet
 
 func init() {
-	verb = 0
-	if args.verb {
-		verb = 5
-	}
-}
-
-func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
 	f.BoolVar(&args.verb, "verb", false, "")
 	f.BoolVar(&args.h, "h", false, "")
@@ -81,7 +74,7 @@ func init() {
 	}
 }
 
-func xo(re *regexp.Regexp, in *argfile.File)  {
+func xoxo(re *regexp.Regexp, in *argfile.File) {
 	var buf []byte
 	//
 	// What is a line? sregexp will tell us.
@@ -90,15 +83,20 @@ func xo(re *regexp.Regexp, in *argfile.File)  {
 		linedef = args.y
 	}
 
-	r, err := sregexp(in, linedef)
+	r, err := xo.NewReaderString(in, "", linedef)
 	var el, sl int
-	for err == nil && r.err == nil {
-		buf, _, err = r.Structure()
+
+	matchfn := r.X
+	if args.y != "" {
+		matchfn = r.Y
+	}
+
+	for err == nil && r.Err() == nil {
+		_, _, err = r.Structure()
 		if err != nil && err != io.EOF {
-			fmt.Println("asdf",err)
 			break
 		}
-
+		buf = matchfn()
 		switch matched := re.Match(buf); {
 		case !args.v && !matched:
 			continue // bad: no match
@@ -109,14 +107,14 @@ func xo(re *regexp.Regexp, in *argfile.File)  {
 		}
 
 		if args.l {
-			if r.line1 == r.line0 {
-				fmt.Printf("%s:%d:	", in.Name, r.line0)
+			if r.Line1 == r.Line0 {
+				fmt.Printf("%s:%d:	", in.Name, r.Line0)
 			} else {
-				fmt.Printf("%s:%d,%d:	", in.Name, r.line0, r.line1)
+				fmt.Printf("%s:%d,%d:	", in.Name, r.Line0, r.Line1)
 			}
 		}
 		if args.o {
-			el += r.last[1]
+			el += r.Last[1]
 			sl = el - len(buf)
 			fmt.Printf("%s:#%d,#%d:	", in.Name, sl, el)
 		}
@@ -174,7 +172,7 @@ func main() {
 	}
 	prog := regexp.MustCompile(fmt.Sprintf("(?%s)%s", flags, re))
 	for fd := range argfile.Next(a...) {
-		xo(prog, fd)
+		xoxo(prog, fd)
 		fd.Close()
 	}
 	if count.match == 0 {
@@ -182,23 +180,6 @@ func main() {
 	}
 }
 
-// sregexp returns a structural regular
-// expression reader compiled for the
-// structure string s. S must be in the
-// form of AddrN constants below. The
-// syntax is similar to the Sam and Acme
-// text editors for Plan 9
-//
-func sregexp(in io.Reader, s string) (*Xo, error) {
-	cmd, err := parseaddr(s)
-	if err != nil {
-		return nil, err
-	}
-	if len(cmd) == 0{
-		return nil, fmt.Errorf("sregexp: empty cmd")
-	}
-	return NewReader(in, cmd...), err
-}
 
 var NL = func() string {
 	if runtime.GOOS == "windows" {
@@ -207,14 +188,6 @@ var NL = func() string {
 	return "\n"
 }()
 
-func moribound(r *bufio.Reader) (err error) {
-	defer r.UnreadRune()
-	if _, _, err = r.ReadRune(); err != nil {
-		verb.Println("moribound", err)
-		return err
-	}
-	return nil
-}
 
 func println(v ...interface{}) {
 	fmt.Print(Prefix)
@@ -276,7 +249,7 @@ FLAGS
 	Regexp:
 
 	-v regexp	Reverse. Print the lines not matching regexp
-	-f file     File contains a list of regexps, one per line
+	-f file     File contains a list of regexps, one per.Line
 				the newline is treated as an OR
 
 	Tagging:
