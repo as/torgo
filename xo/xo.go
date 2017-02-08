@@ -180,14 +180,12 @@ func main() {
 	}
 }
 
-
 var NL = func() string {
 	if runtime.GOOS == "windows" {
 		return "\r\n"
 	}
 	return "\n"
 }()
-
 
 func println(v ...interface{}) {
 	fmt.Print(Prefix)

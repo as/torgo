@@ -52,6 +52,7 @@ func multi(rie []string) (ac string, err error) {
 	}
 	return ac, nil
 }
+
 var ls = `./go/src/9fans.net/go/.git/config
 ./go/src/9fans.net/go/.hgignore
 ./go/src/9fans.net/go/LICENSE
