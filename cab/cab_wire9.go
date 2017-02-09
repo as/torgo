@@ -33,10 +33,9 @@ func ioErr(name, kind string, ac, ex int) error {
 
 type block struct {
 	crc   uint32
-	size  uint16
 	zsize uint16
+	size  uint16
 	mshdr uint16
-	zdata []byte
 }
 
 func (z *block) ReadBinary(r io.Reader) (err error) {
@@ -48,25 +47,16 @@ func (z *block) ReadBinary(r io.Reader) (err error) {
 		return err
 	}
 
-	if err := binary.Read(r, binary.LittleEndian, &z.size); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &z.zsize); err != nil {
 		return err
 	}
 
-	if err := binary.Read(r, binary.LittleEndian, &z.zsize); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &z.size); err != nil {
 		return err
 	}
 
 	if err := binary.Read(r, binary.LittleEndian, &z.mshdr); err != nil {
 		return err
-	}
-
-	z.zdata = make([]byte, int(z.size)-2)
-
-	if n, err := r.Read(z.zdata); err != nil || n != int(z.size)-2 {
-		if err != nil {
-			return err
-		}
-		return fmt.Errorf("expected %d bytes, got %d", int(z.size)-2, n)
 	}
 
 	return nil
@@ -78,19 +68,15 @@ func (z block) WriteBinary(w io.Writer) (err error) {
 		return err
 	}
 
-	if err := binary.Write(w, binary.LittleEndian, z.size); err != nil {
-		return err
-	}
-
 	if err := binary.Write(w, binary.LittleEndian, z.zsize); err != nil {
 		return err
 	}
 
-	if err := binary.Write(w, binary.LittleEndian, z.mshdr); err != nil {
+	if err := binary.Write(w, binary.LittleEndian, z.size); err != nil {
 		return err
 	}
 
-	if n, err := w.Write(z.zdata); err != nil || n != int(z.size)-2 {
+	if err := binary.Write(w, binary.LittleEndian, z.mshdr); err != nil {
 		return err
 	}
 
