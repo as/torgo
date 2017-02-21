@@ -265,9 +265,8 @@ FLAGS
 
 	Regexp:
 
-	-v regexp	Reverse. Print the lines not matching regexp
-	-f file     File contains a list of regexps, one per.Line
-				the newline is treated as an OR
+	-v regexp   Reverse. Print the lines not matching regexp
+	-f file     Read a list of disjunctive regexps to match from file
 
 	Tagging:
 
@@ -299,7 +298,5 @@ EXAMPLE
 
 BUGS
 	It's difficult to understand -x and -y
-
-	
 `)
 }
