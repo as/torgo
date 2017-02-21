@@ -278,7 +278,6 @@ FLAGS
 
 	-q  Quote (escape) all matched output (may be removed)
 
-
 EXAMPLE
 	Search file.txt for apple, output matching lines
           xo -l apple file.txt
