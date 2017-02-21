@@ -143,9 +143,9 @@ func xoxo(re *regexp.Regexp, in *argfile.File) {
 	}
 	if args.n || args.N {
 		if args.N && nmatched == 0 {
-			fmt.Printf("%s")
+			fmt.Printf("%s", in.Name)
 		} else if args.n && nmatched != 0 {
-			fmt.Printf("%s")
+			fmt.Printf("%s", in.Name)
 		}
 	}
 	count.match += nmatched
