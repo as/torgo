@@ -13,13 +13,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"regexp"
 	"runtime"
 	"strings"
-)
 
-import (
 	"github.com/as/argfile"
 	"github.com/as/mute"
 	"github.com/as/xo"
@@ -40,6 +39,7 @@ var args struct {
 	l       bool
 	p       bool
 	v       bool
+	n, N    bool
 	f       string
 	x       string
 	y       string
@@ -53,6 +53,8 @@ var count struct {
 var f *flag.FlagSet
 
 func init() {
+	log.SetFlags(0)
+	log.SetPrefix(Prefix)
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
 	f.BoolVar(&args.verb, "verb", false, "")
 	f.BoolVar(&args.h, "h", false, "")
@@ -63,6 +65,8 @@ func init() {
 	f.BoolVar(&args.l, "l", false, "")
 	f.BoolVar(&args.o, "o", false, "")
 	f.BoolVar(&args.p, "p", false, "")
+	f.BoolVar(&args.n, "n", false, "")
+	f.BoolVar(&args.N, "N", false, "")
 	f.StringVar(&args.x, "x", `/.*\n/`, "")
 	f.StringVar(&args.y, "y", "", "")
 	f.BoolVar(&args.r, "r", false, "")
@@ -71,6 +75,13 @@ func init() {
 	if err != nil {
 		//printerr(err)//todo
 		os.Exit(1)
+	}
+	if args.n && args.N {
+		log.Fatalln("user error: -n and -N set")
+	}
+	if args.n || args.N {
+		args.l = false
+		args.o = false
 	}
 }
 
@@ -91,6 +102,7 @@ func xoxo(re *regexp.Regexp, in *argfile.File) {
 		matchfn = r.Y
 	}
 
+	nmatched := int64(0)
 	for err == nil && r.Err() == nil {
 		_, _, err = r.Structure()
 		if err != nil && err != io.EOF {
@@ -102,10 +114,11 @@ func xoxo(re *regexp.Regexp, in *argfile.File) {
 			continue // bad: no match
 		case args.v && matched:
 			continue // bad: unwanted match
-		default:
-			count.match++
 		}
-
+		nmatched++
+		if args.n || args.N {
+			continue
+		}
 		if args.l {
 			if r.Line1 == r.Line0 {
 				fmt.Printf("%s:%d:	", in.Name, r.Line0)
@@ -128,11 +141,19 @@ func xoxo(re *regexp.Regexp, in *argfile.File) {
 			fmt.Println()
 		}
 	}
+	if args.n || args.N {
+		if args.N && nmatched == 0 {
+			fmt.Printf("%s")
+		} else if args.n && nmatched != 0 {
+			fmt.Printf("%s")
+		}
+	}
+	count.match += nmatched
 	if err == io.EOF {
 		err = nil
 	}
 	if err != nil {
-		printerr(err)
+		log.Println(err)
 	}
 }
 
@@ -191,15 +212,13 @@ func println(v ...interface{}) {
 	fmt.Print(Prefix)
 	fmt.Println(v...)
 }
-
 func printerr(v ...interface{}) {
-	fmt.Fprint(os.Stderr, Prefix)
-	fmt.Fprintln(os.Stderr, v...)
+	log.Println(v...)
 }
 
 func debugerr(v ...interface{}) {
 	if Debug {
-		printerr(v)
+		log.Println(v...)
 	}
 }
 
@@ -218,7 +237,7 @@ DESCRIPTION
 
 	The notion of a line can be redefined by setting -x. This
 	provides the ability to capture arbitrary text not
-	delimited by lines.
+	delimited by newlines.
 
 	The following 4 operations define text selection on the regular
 	expression (re):
@@ -235,8 +254,8 @@ DESCRIPTION
 	The default linedef is simply: xo -x /./,/\n/
 
 	Xo reads lines from stdin unless a file list is given. If '-' is 
-	present in the file list, xo reads a list of files from
-	stdin instead of treating stdin as a file.
+	present in the file list, xo reads a list of files from stdin 
+	instead of treating stdin as a file.
 
 FLAGS
 	Linedef:
@@ -252,32 +271,34 @@ FLAGS
 
 	Tagging:
 
-	-o  Preprend file:rune,rune offsets
-	-l	Preprend file:line,line offsets
-	-L  Print file names containing no matches
-	-p  Print new line after every match
+	-o  Mark each match with its file name and rune offset
+	-l  Mark each match with its file name and line offset
+	-n  Print only the file name containing a match
+	-N  Print only the file name not containing a match
+	-p  Print extra new line after a match
 
-	-q  Quote (escape) all output (may be removed)
+	-q  Quote (escape) all matched output (may be removed)
 
 
 EXAMPLE
-	# Examples operate on this help page, so
-	xo -h > help.txt
-
-	# Print the DESCRIPTION section from this help
-	xo -l -x '/[A-Z]+\n/,/\n\n[A-Z]+/' DESC help.txt
-
+	Search file.txt for apple, output matching lines
+          xo -l apple file.txt
+	Search directory for files containing apple, print filenames
+          walk -f | xo -N apple -
+	Search cpp files for camelcase; tag output with file:line
+          walk -f | xo "\.cpp\n" | xo -l [A-Z][a-z]+[A-Z][a-z]+ -
+        
+	The next examples use this help section, so
+          xo -h > help.txt
+	Search for words starting with "a", print matching words
+          xo -p -x "/[A-Za-z]+/" "^a" help.txt
+	Print the description section
+          xo -l -x "/[A-Z]+\n/,/\n\n[A-Z]+/" DESC help.txt
+	Select fields by whitespace, print each field
+          xo -p -l -y "/[ \t]/"  . help.txt
 
 BUGS
-	On a multi-line match, xo -l prints the offset
-	of the final line in that match.
-
-	It's difficult to understand -x from this manual.
-
-	As of Jul 31 2016, the following do not work:
-
-	1) xo -y
-	2) Line and byte offsets
+	It's difficult to understand -x and -y
 
 	
 `)
