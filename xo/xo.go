@@ -67,7 +67,7 @@ func init() {
 	f.BoolVar(&args.p, "p", false, "")
 	f.BoolVar(&args.n, "n", false, "")
 	f.BoolVar(&args.N, "N", false, "")
-	f.StringVar(&args.x, "x", `/.*\n/`, "")
+	f.StringVar(&args.x, "x", `/.*\n?/`, "")
 	f.StringVar(&args.y, "y", "", "")
 	f.BoolVar(&args.r, "r", false, "")
 	f.BoolVar(&args.v, "v", false, "")
