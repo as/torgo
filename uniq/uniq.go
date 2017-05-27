@@ -41,6 +41,7 @@ var args struct {
 	r    bool
 	d    bool
 	c    bool
+	l	bool
 	x    string
 	y    string
 	s    string
@@ -55,6 +56,7 @@ func init() {
 	f.BoolVar(&args.h, "h", false, "")
 	f.BoolVar(&args.q, "?", false, "")
 	f.BoolVar(&args.d, "d", false, "")
+	f.BoolVar(&args.l, "l", false, "")
 	f.BoolVar(&args.c, "c", false, "")
 	f.StringVar(&args.x, "x", ".+", "")
 	f.StringVar(&args.y, "y", "", "")
@@ -150,8 +152,6 @@ func main() {
 		re     		*regexp.Regexp
 		selfn  		Selector
 		fs   		field
-		printfn		func(i ...interface{}) (int, error)
-		count		int
 	)
 	if args.h || args.q {
 		usage()
@@ -166,41 +166,75 @@ func main() {
 		re = regexp.MustCompile(args.x)
 		selfn = re.FindAllString
 	}
+	if args.l {
+		args.d = true
+	}
 
-	printfn = fmt.Println
-	if args.c {
-		printfn = func(i ...interface{}) (int, error) {
-			fmt.Print(count, "	")
-			fmt.Println(i...)
-			return 0, nil
-		}
+	printfn := func(i int, s string){
+		fmt.Println(s)
 	}
 
 	in := make(chan File)
 	go walker(in, f.Args()...)
-
+	
+	
+	buf := make([]string, 0, 1024*1024)
+	full := make(map[string]int)
+	sel := make(map[int]string)
 	seen := make(map[string]int)
-	isdup := func(s string) int {
+	printed := make(map[string]int)
+	i := 0
+	if args.c {
+		printfn = func(i int, s string)  {
+			fmt.Print(i, "	")
+			fmt.Println(s)
+		}
+	}
+	isdup := func(s string) (int) {
 		match := selfn(s, -1)
-		debugerr("match",match)
 		subf  := strings.Join(fs.Extract(match...), "")
-		debugerr("string",fs.Extract(match...))
+		sel[i]=subf
+		if args.d || seen[subf] == 0{
+			// memorize the complete string represented by the selection
+			// -d is lifo
+			full[subf]=i
+		}
 		seen[subf]++
+		buf = append(buf, s); i++
 		return seen[subf]
 	}
 
 	for file := range in {
 		for sc := bufio.NewScanner(file); sc.Scan(); {
-			line := sc.Text()
-			count = isdup(line)
-			switch {
-			case args.d:
-				fallthrough
-			case count == 1:
-				printfn(line)
-			}
+			isdup(sc.Text())
 		}
 		file.Close()
+	}
+	
+	if !args.d{
+		for i, s := range buf{
+			ct := seen[sel[i]]
+			if ct == 1{
+				printfn(ct, s)
+			} else {
+				if printed[sel[i]] == 0 {
+					printfn(ct, s)
+					printed[sel[i]]++
+				}
+			}
+		}
+	} else {
+		for i, s := range buf{
+			ct := seen[sel[i]]
+			if ct == 1{
+				continue
+			} 
+			if printed[sel[i]] < ct-1 && args.l {
+				printed[sel[i]]++
+			} else {
+				printfn(ct, s)
+			}
+		}
 	}
 
 }
@@ -264,8 +298,8 @@ SYNOPSIS
 	uniq [-x regexp | -y regexp] [-s n¹:nⁿ] [-u -d -c] [file]
 
 DESCRIPTION
-	Uniq reads lines from file or standard input and tests each
-	one for uniquness based on previous input lines.
+	Uniq reads lines from file or standard input and prints out
+	unique lines.
 
 	The -x and -y flags use regexp to partition each input line
 	into substrings.  The -s flag uses an index expression f¹:fⁿ
@@ -276,8 +310,9 @@ DESCRIPTION
 
 FLAGS
 	-c	Prefix repetition count to each duplicate.
-	-d	Reverse. Print only duplicates.
-	-u	Reverse. Print only duplicates.
+	-d	Print only duplicates.
+	-l	Print only the last duplicate.
+	-u	Print only lines without duplicates
 
 	-x regexp   Extract substrings matching regexp and 
 				limit uniqueness tests to those strings.
