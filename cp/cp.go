@@ -70,6 +70,7 @@ func cp(dir string) {
 				dst = clean(dir+"/"+src)
 			}
 			wg.Add(1)
+			semaquire()
 			printerr("docp", dst, src)
 			go docp(dst, src)
 		}
@@ -80,7 +81,6 @@ func cp(dir string) {
 	wg.Wait()
 }
 func docp(dst, src string) (n int64, err error) {
-	semaquire()
 	defer semrelease()
 	defer wg.Done()
 
