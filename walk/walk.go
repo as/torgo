@@ -26,8 +26,7 @@ const Prefix = "walk: "
 // goroutines. optimal number undetermined.
 
 var (
-	NGo   = 1024
-	sem   = make(chan struct{}, NGo)
+	NGo   = 1024*16
 	gosem = make(chan struct{}, NGo)
 )
 
@@ -221,34 +220,44 @@ func dft1(nm string, wg *sync.WaitGroup, deep int64, listch chan<- string) {
 func bft(name string, fn func(string)) {
 	list := make(chan *Dir, NGo)
 	var wg sync.WaitGroup
-	go func() {
-		wg.Add(1)
-		list <- dirs(name, 1)
-		wg.Wait()
-		close(list)
-	}()
-	for dir := range list {
-		if dir == nil {
-			continue
+	fnx := make(chan *Dir, NGo+1)
+	
+	go func(){
+		var wg2 sync.WaitGroup
+		for d := range fnx{
+			wg2.Add(len(d.Files))
+			for _, f := range d.Files {
+				go func(d *Dir, f os.FileInfo){
+					kid := filepath.Join(d.Name, f.Name())
+					run.print(kid)
+					if f.IsDir(){
+						list <- dirs(kid, d.Level+1)
+					}
+					wg2.Done()
+				}(d, f)
+			}
+			wg2.Wait()
+			wg.Done()
 		}
-		gosem <- struct{}{}
-		go func(d *Dir) {
-			defer wg.Done()
-			if d.Level > args.t {
+	}()
+	wg.Add(1)
+	fnx <- dirs(name, 1)
+	go func(){
+		for dir := range list {
+			if dir == nil{
+				continue
+			}
+			if dir.Level > args.t {
 				return
 			}
-			for _, f := range d.Files {
-				kid := filepath.Join(d.Name, f.Name())
-				run.print(kid)
-				if f.IsDir() && !visitedfunc(kid) {
-					wg.Add(1)
-					list <- dirs(kid, d.Level+1)
-				}
-			}
-			<- gosem 
-		}(dir)
-	}
+			wg.Add(1)
+			fnx <- dir
+		}
+	}()
+	wg.Wait()
+	close(list)
 }
+
 
 func dirs(n string, level int64) (dir *Dir) {
 	f, err := ioutil.ReadDir(n)
