@@ -23,6 +23,8 @@ func init() {
 	if DevNull, err = os.Open(os.DevNull); err != nil {
 		log.Fatal(err)
 	}
+	log.SetFlags(0)
+	log.SetPrefix("rewire: ")
 }
 
 // Cmd wraps *exec.Cmd and keeps track of which
@@ -86,23 +88,16 @@ func (c *Cmd) Start() error {
 
 // CmdParse splits the argument into fields, and the
 // fields are tokenized into a new command and arguments.
-//
-// This is actually a bad practice. We do
-// it here because it would be very difficult
-// to detect whether '-0 somecmd' is part of the subcommand
-// or given as an option to this program.
-//
-func CmdParse(args string) (*exec.Cmd, error) {
-	cmdtext := strings.Fields(args)
-	switch len(cmdtext) {
+func CmdParse(args ...string) (*exec.Cmd, error) {
+	switch len(args) {
 	case 0:
-		return nil, fmt.Errorf("no command given", cmdtext)
+		return nil, fmt.Errorf("no command given", args)
 	case 1:
-		debug("command is: %q\n", cmdtext[0])
-		return exec.Command(cmdtext[0]), nil
+		debug("command is: %q\n", args[0])
+		return exec.Command(args[0]), nil
 	default:
-		debug("command is: %q\n", cmdtext)
-		return exec.Command(cmdtext[0], cmdtext[1:]...), nil
+		debug("command is: %q\n", args)
+		return exec.Command(args[0], args[1:]...), nil
 	}
 }
 
@@ -114,20 +109,16 @@ func main() {
 	}
 
 	//
-	// We need to know if and when any of these
-	// command terminate early. We don't want to
-	// exit this program until they die, and we
-	// also don't want to linger in this process
-	// when everything exits.
+	// Need to know when commands terminate early.
 	//
 	var wg sync.WaitGroup    // knows when everything exits
 	done := make(chan error) // recieves errors until closed
 
-	if parsed.finalcmd == "" {
-		parsed.finalcmd = "cat"
+	if len(parsed.finalcmd) == 0 {
+		parsed.finalcmd = []string{"cat"}
 	}
 	// Create the final command, but don't run it yet
-	m, err := CmdParse(parsed.finalcmd)
+	m, err := CmdParse(parsed.finalcmd...)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -137,7 +128,7 @@ func main() {
 	// time, we will only mention stdout and stdin in the manual. The
 	// redirects are applied to the final command before it is executed.
 	for _, r := range parsed.redirs {
-		cmd, err := CmdParse(r.cmd)
+		cmd, err := CmdParse(strings.Fields(r.cmd)...)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -196,7 +187,7 @@ func Waiter(cmd *exec.Cmd, done chan error) {
 // checksarg validates the input arguments and
 // terminates the process if they are invalid.
 func checkarg(A []string) []string {
-	if len(A) < 1 {
+	if len(A) <= 1 {
 		no(fmt.Errorf("usage: rewire -0 cmd ... [-n cmd]"))
 	}
 	if A[1] == "-h" {

@@ -26,7 +26,7 @@ type parser struct {
 
 	redirs   []Op
 	source   []string
-	finalcmd string
+	finalcmd []string
 }
 
 // Parse parses the input list for redirections
@@ -87,10 +87,11 @@ func (p *parser) parseCmd() error {
 // invalid and trigger an error.
 func (p *parser) parseFinal() error {
 	defer un(trace("parseFinal"))
-	p.finalcmd = p.tok
-	badtok := p.next()
-	if badtok != "" {
-		return fmt.Errorf("command not quoted: %q", p.finalcmd)
+
+	// Let exec handle the last argument
+	for p.tok != ""{
+		p.finalcmd = append(p.finalcmd, p.tok)
+		p.tok = p.next()
 	}
 	return nil
 }
