@@ -75,11 +75,10 @@ func NewFilterReader(r io.Reader, fn Filter) *FilterReader {
 
 func (f *FilterReader) Read(p []byte) (n int, err error) {
 	n, err = f.r.Read(p)
-	if err != nil {
-		return
+	if n > 0{
+		n = copy(p, f.fn(p[:n]))
 	}
-	n = copy(p, f.fn(p[:n]))
-	return
+	return n, err
 }
 
 
