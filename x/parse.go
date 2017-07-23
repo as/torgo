@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 type parser struct {
@@ -285,91 +284,18 @@ func parseCmd(p *parser) (c *Command) {
 			if len(x) > 1 {
 				a = x[1:]
 			}
-
-			cmd := exec.Command(n, a...)
 			q0, q1 := f.Dot()
-			f.Delete(q0, q1)
-			q1 = q0
-			var fd0 io.WriteCloser
-			fd1, err := cmd.StdoutPipe()
-			if err != nil {
-				panic(err)
-			}
-			fd2, err := cmd.StderrPipe()
-			if err != nil {
-				panic(err)
-			}
-			fd0, err = cmd.StdinPipe()
-			if err != nil {
-				panic(err)
-			}
-			_, err = io.Copy(fd0, bytes.NewReader(append([]byte{}, f.Bytes()[q0:q1]...)))
+			cmd := exec.Command(n, a...)
+			cmd.Stdin = bytes.NewReader(append([]byte{}, f.Bytes()[q0:q1]...))
+			buf := new(bytes.Buffer)
+			cmd.Stdout = buf
+			err := cmd.Run()
 			if err != nil {
 				eprint(err)
-				return
 			}
-			fd0.Close()
-			var wg sync.WaitGroup
-			donec := make(chan bool)
-			outc := make(chan []byte)
-			errc := make(chan []byte)
-			wg.Add(2)
-			go func() {
-				defer wg.Done()
-				b := make([]byte, 65536)
-				for {
-					select {
-					case <-donec:
-						return
-					default:
-						n, err := fd1.Read(b)
-						if err != nil {
-							if err == io.EOF {
-								break
-							}
-							eprint(err)
-						}
-						outc <- append([]byte{}, b[:n]...)
-					}
-				}
-			}()
+			f.Delete(q0, q1)
+			f.Insert(buf.Bytes(), q0)
 
-			go func() {
-				defer wg.Done()
-				b := make([]byte, 65536)
-				for {
-					select {
-					case <-donec:
-						return
-					default:
-						n, err := fd2.Read(b)
-						if err != nil {
-							if err == io.EOF {
-								break
-							}
-						}
-						errc <- append([]byte{}, b[:n]...)
-					}
-				}
-			}()
-			go func() {
-				cmd.Start()
-				cmd.Wait()
-				close(donec)
-			}()
-		Loop:
-			for {
-				select {
-				case p := <-outc:
-					f.Insert(p, q1)
-					q1 += int64(len(p))
-				case p := <-errc:
-					f.Insert(p, q1)
-					q1 += int64(len(p))
-				case <-donec:
-					break Loop
-				}
-			}
 		}
 		return
 	case ">":
