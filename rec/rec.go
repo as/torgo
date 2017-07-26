@@ -154,7 +154,7 @@ EXAMPLES
       rec -r 0,0,640,480 > x.bmp
 
     Capture a 640x480 RGB bitmap stream at 30fps and display it
-      rec -r 0,0,640,480 | page
+      rec -r 0,0,640,480 -f 30 | page
 
 BUGS
 	The video stream is an uncompressed rgb stream instead of
