@@ -23,6 +23,8 @@ var arg struct {
 	n, v       bool
 	d          string
 	e          string
+	h bool
+	q bool
 }
 
 var f *flag.FlagSet
@@ -61,6 +63,9 @@ func Pass() (string, error) {
 }
 
 func Signers() (signers []ssh.Signer, err error) {
+	if arg.d == ""{
+		return nil, fmt.Errorf("no ssh key path specified")
+	}
 	buf, err := ioutil.ReadFile(arg.d)
 	no(err)
 	d, err := ssh.ParsePrivateKey(buf)
@@ -89,20 +94,18 @@ func no(err error) {
 
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
-
+	f.BoolVar(&arg.h, "h", false, "")
+	f.BoolVar(&arg.q, "?", false, "")
 	f.StringVar(&arg.s, "s", os.Getenv("ssh"), "")
 	f.StringVar(&arg.u, "u", os.Getenv("user"), "")
-	f.StringVar(&arg.u, "p", os.Getenv("password"), "")
-	f.StringVar(&arg.d, "d", "key.pem", "")
-	f.StringVar(&arg.e, "e", "cert.pem", "")
-	f.StringVar(&arg.c, "c", "", "")
+	f.StringVar(&arg.p, "p", os.Getenv("password"), "")
+	f.StringVar(&arg.d, "d", "", "")
 	f.BoolVar(&arg.n, "n", false, "")
 	f.BoolVar(&arg.v, "v", false, "")
 
 	err := mute.Parse(f, os.Args[1:])
 	if err != nil {
 		printerr(err)
-		os.Exit(1)
 	}
 }
 
@@ -110,17 +113,22 @@ var addr *Addr
 
 func main() {
 	addr = dialsplit(arg.s)
-	if arg.s == "" || addr == nil {
-		printerr("set $ssh")
+	if arg.s == "" || arg.h || arg.q || addr == nil {
+		usage()
 		os.Exit(1)
 	}
 	config := &ssh.ClientConfig{
 		User: arg.u,
-		Auth: []ssh.AuthMethod{
-			ssh.PublicKeysCallback(Signers),
-			ssh.PasswordCallback(Pass),
-		},
 	}
+	if arg.d != ""{
+		config.Auth = append(config.Auth, ssh.PublicKeysCallback(Signers))
+	}
+	if arg.p != ""{
+		config.Auth = append(config.Auth, ssh.PasswordCallback(Pass))
+	} else {
+		panic("no")
+	}
+
 	addrsvc := addr.addr + ":" + addr.svc
 	conn, err := ssh.Dial(addr.net, addrsvc, config)
 	if err != nil {
