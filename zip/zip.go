@@ -6,9 +6,9 @@
 package main
 
 import (
-	"bytes"
 	"archive/zip"
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -26,11 +26,11 @@ var f *flag.FlagSet
 
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
-	f.BoolVar(&args.c,  "c",  true,  "")
-	f.BoolVar(&args.x,  "x",  false, "")
-	f.BoolVar(&args.v,  "v",  false, "")
-	f.BoolVar(&args.t,  "t",  false, "")
-	f.StringVar(&args.f, "f", "",  "")
+	f.BoolVar(&args.c, "c", true, "")
+	f.BoolVar(&args.x, "x", false, "")
+	f.BoolVar(&args.v, "v", false, "")
+	f.BoolVar(&args.t, "t", false, "")
+	f.StringVar(&args.f, "f", "", "")
 	err := mute.Parse(f, os.Args[1:])
 	if err != nil {
 		log.Println(err)
@@ -76,7 +76,7 @@ func writezip(w io.Writer) {
 			}
 			// Write the header and file into the archive
 			hdr := &zip.FileHeader{
-				Name: name,
+				Name:               name,
 				UncompressedSize64: uint64(fi.Size()),
 			}
 			out, err := tw.CreateHeader(hdr)
@@ -100,13 +100,13 @@ func readzip(in io.Reader, size int64) {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(in)
 	err := func() error {
-		tr, err  := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
-		if err != nil{
+		tr, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+		if err != nil {
 			return err
 		}
 		for _, f := range tr.File {
 			hdr := f.FileHeader
-			if err != nil{
+			if err != nil {
 				log.Printf("error:", err)
 				continue
 			}
@@ -118,7 +118,7 @@ func readzip(in io.Reader, size int64) {
 				fmt.Fprintln(os.Stderr, hdr.Name)
 			}
 			os.MkdirAll(filepath.Dir(hdr.Name), 0700)
-	
+
 			fd, err := os.Create(hdr.Name)
 			if err != nil {
 				// memory leak
@@ -141,7 +141,7 @@ func readzip(in io.Reader, size int64) {
 		}
 		return nil
 	}()
-	if err != nil{
+	if err != nil {
 		log.Printf("error: %s", err)
 	}
 }
