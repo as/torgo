@@ -11,9 +11,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
-	"io"
 	"strconv"
 	"strings"
 )
@@ -27,6 +27,7 @@ const (
 	BufferSize = 1024 * 1024
 	Debug      = false // true false
 )
+
 type Reader io.ReadCloser
 
 type File struct {
@@ -41,7 +42,7 @@ var args struct {
 	r    bool
 	d    bool
 	c    bool
-	l	bool
+	l    bool
 	x    string
 	y    string
 	s    string
@@ -86,17 +87,18 @@ func (r field) Extract(s ...string) []string {
 	n := max(r[0], 0)
 	m := min(r[1], l)
 	if n == m {
-		m = n+1
+		m = n + 1
 	}
 	defer func() {
 		if e := recover(); e != nil {
-		fmt.Printf("s %T %v\n", s, s)
-		fmt.Printf("l %T %v\n", l, l)
-		fmt.Printf("n %T %v\n", n, n)
-		fmt.Printf("m %T %v\n", m, m)
-		fmt.Printf("r %T %v\n", r, r)
-		os.Exit(1)
-	}}()
+			fmt.Printf("s %T %v\n", s, s)
+			fmt.Printf("l %T %v\n", l, l)
+			fmt.Printf("n %T %v\n", n, n)
+			fmt.Printf("m %T %v\n", m, m)
+			fmt.Printf("r %T %v\n", r, r)
+			os.Exit(1)
+		}
+	}()
 	if n > m && n < l {
 		return []string{s[n]}
 	}
@@ -110,14 +112,16 @@ func (r field) Extract(s ...string) []string {
 func mustAtoi(s string) (i int) {
 	i, err := strconv.Atoi(s)
 	if err != nil {
-		printerr(err); os.Exit(1)
+		printerr(err)
+		os.Exit(1)
 	}
 	return i
 }
 func mustSplit(s, sep string, no int) (a []string) {
 	a = strings.Split(s, sep)
 	if len(a) < no {
-		printerr("bad range:", s); os.Exit(1)
+		printerr("bad range:", s)
+		os.Exit(1)
 	}
 	return a
 }
@@ -128,8 +132,10 @@ func mustRange(s string) field {
 	}
 	n := strings.Index(s, ":")
 	switch n {
-	case -1: return field{mustAtoi(s), 0}
-	case  0: return field{0, mustAtoi(s)}
+	case -1:
+		return field{mustAtoi(s), 0}
+	case 0:
+		return field{0, mustAtoi(s)}
 	default:
 		mn := mustSplit(s, ":", 2)
 		return field{mustAtoi(mn[0]), mustAtoi(mn[1])}
@@ -149,9 +155,9 @@ func min(n, m int) int {
 
 func main() {
 	var (
-		re     		*regexp.Regexp
-		selfn  		Selector
-		fs   		field
+		re    *regexp.Regexp
+		selfn Selector
+		fs    field
 	)
 	if args.h || args.q {
 		usage()
@@ -170,14 +176,13 @@ func main() {
 		args.d = true
 	}
 
-	printfn := func(i int, s string){
+	printfn := func(i int, s string) {
 		fmt.Println(s)
 	}
 
 	in := make(chan File)
 	go walker(in, f.Args()...)
-	
-	
+
 	buf := make([]string, 0, 1024*1024)
 	full := make(map[string]int)
 	sel := make(map[int]string)
@@ -185,22 +190,23 @@ func main() {
 	printed := make(map[string]int)
 	i := 0
 	if args.c {
-		printfn = func(i int, s string)  {
+		printfn = func(i int, s string) {
 			fmt.Print(i, "	")
 			fmt.Println(s)
 		}
 	}
-	isdup := func(s string) (int) {
+	isdup := func(s string) int {
 		match := selfn(s, -1)
-		subf  := strings.Join(fs.Extract(match...), "")
-		sel[i]=subf
-		if args.d || seen[subf] == 0{
+		subf := strings.Join(fs.Extract(match...), "")
+		sel[i] = subf
+		if args.d || seen[subf] == 0 {
 			// memorize the complete string represented by the selection
 			// -d is lifo
-			full[subf]=i
+			full[subf] = i
 		}
 		seen[subf]++
-		buf = append(buf, s); i++
+		buf = append(buf, s)
+		i++
 		return seen[subf]
 	}
 
@@ -210,11 +216,11 @@ func main() {
 		}
 		file.Close()
 	}
-	
-	if !args.d{
-		for i, s := range buf{
+
+	if !args.d {
+		for i, s := range buf {
 			ct := seen[sel[i]]
-			if ct == 1{
+			if ct == 1 {
 				printfn(ct, s)
 			} else {
 				if printed[sel[i]] == 0 {
@@ -224,11 +230,11 @@ func main() {
 			}
 		}
 	} else {
-		for i, s := range buf{
+		for i, s := range buf {
 			ct := seen[sel[i]]
-			if ct == 1{
+			if ct == 1 {
 				continue
-			} 
+			}
 			if printed[sel[i]] < ct-1 && args.l {
 				printed[sel[i]]++
 			} else {
