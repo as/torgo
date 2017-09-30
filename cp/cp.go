@@ -1,4 +1,4 @@
-// Copyright 2015 "as". 
+// Copyright 2015 "as".
 package main
 
 import (
@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	Prefix     = "cp: "
+	Prefix = "cp: "
 )
 
 var args struct {
@@ -22,22 +22,22 @@ var args struct {
 	a    bool
 	v    bool
 	p    bool
-	f	bool
+	f    bool
 }
 
 var (
-	wg sync.WaitGroup
+	wg     sync.WaitGroup
 	ticket chan struct{}
 )
 
-func init(){
+func init() {
 	ticket = make(chan struct{}, 1024)
 }
-func semaquire(){
+func semaquire() {
 	ticket <- struct{}{}
 }
-func semrelease(){
-	<- ticket
+func semrelease() {
+	<-ticket
 }
 
 func main() {
@@ -65,9 +65,9 @@ func cp(dir string) {
 			src := clean(suf)
 			var dst string
 			if args.f {
-				dst =  clean(dir+"/"+filepath.Base(src))
+				dst = clean(dir + "/" + filepath.Base(src))
 			} else {
-				dst = clean(dir+"/"+src)
+				dst = clean(dir + "/" + src)
 			}
 			wg.Add(1)
 			semaquire()
