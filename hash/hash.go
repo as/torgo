@@ -1,17 +1,17 @@
 package main
 
 import (
-	"hash"
+	"bufio"
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
+	"flag"
+	"fmt"
+	"hash"
+	"io"
 	"os"
 	"sync"
-	"fmt"
-	"flag"
-	"io"
-	"bufio"
 )
 
 import (
@@ -20,8 +20,8 @@ import (
 
 import (
 	"golang.org/x/crypto/md4"
-	"golang.org/x/crypto/sha3"
 	"golang.org/x/crypto/ripemd160"
+	"golang.org/x/crypto/sha3"
 )
 
 const (
@@ -32,9 +32,9 @@ const (
 
 var args struct {
 	h, q bool
-	b bool
+	b    bool
 	stfu bool
-	csp int
+	csp  int
 }
 
 var f *flag.FlagSet
@@ -52,7 +52,7 @@ func init() {
 	}
 }
 
-var std = map[string]func() (hash.Hash){
+var std = map[string]func() hash.Hash{
 	"md4":       md4.New,
 	"md5":       md5.New,
 	"sha1":      sha1.New,
@@ -134,7 +134,7 @@ func walker(to chan File, args ...string) {
 	}()
 }
 
-func hasher(init func() (hash.Hash), in, out chan File) {
+func hasher(init func() hash.Hash, in, out chan File) {
 	var wg sync.WaitGroup
 	for f := range in {
 		wg.Add(1)
