@@ -1,17 +1,18 @@
 package main
+
 // Digraph traversal. Adapted from the tool in the Go source tree. Same license as the Go language.
 // TODO: add example
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"bytes"
 	"sort"
 	"strconv"
-	"errors"
 	"unicode"
 	"unicode/utf8"
 )
@@ -21,21 +22,21 @@ import (
 )
 
 const (
-	Prefix     = "digra: "
-	MaxBuffer  = 1024*1024*512
-	Debug      = true
+	Prefix    = "digra: "
+	MaxBuffer = 1024 * 1024 * 512
+	Debug     = true
 )
-
 
 var f *flag.FlagSet
 var args struct {
 	h, q bool
 	f    string
 }
+
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
-	f.BoolVar(&args.h,   "h", false,  "")
-	f.BoolVar(&args.q,   "?", false,  "")
+	f.BoolVar(&args.h, "h", false, "")
+	f.BoolVar(&args.q, "?", false, "")
 	err := mute.Parse(f, os.Args[1:])
 	fatal(err)
 }
@@ -44,11 +45,11 @@ func main() {
 		g graph
 	)
 	go func() {
-		fd, err := os.Open(f.Args()[0]);
+		fd, err := os.Open(f.Args()[0])
 		g, err = parse(fd)
 		fatal(err)
 	}()
-	in := bufio.NewScanner(stdin); 
+	in := bufio.NewScanner(stdin)
 	for in.Scan() {
 		words, err := split(in.Text())
 		fatal(err)
@@ -61,7 +62,7 @@ func main() {
 
 type nodes []string
 
-var(
+var (
 	ctl  = os.Stdin
 	data = args.f
 	out  = os.Stdout
@@ -514,8 +515,8 @@ COMMANDS      ARGS
 	beatit           exit
 	strong    n      print nodes strongly connected to n
 	strongs   n      print all strongly connected nodes
-`)}
-
+`)
+}
 
 func usage() {
 	fmt.Println(`
