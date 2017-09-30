@@ -42,13 +42,13 @@ var (
 )
 
 var args struct {
-	h, q       bool
-	r          bool
-	a, s, m    string
-	l          int
-	k, f, e    string
-	i          string
-    p          string
+	h, q    bool
+	r       bool
+	a, s, m string
+	l       int
+	k, f, e string
+	i       string
+	p       string
 }
 
 var f *flag.FlagSet
