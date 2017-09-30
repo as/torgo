@@ -1,20 +1,20 @@
 package main
 
 import (
-	"strings"
+	"bufio"
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 	"unicode"
 	"unicode/utf8"
-	"os"
-	"bufio"
-	"os/exec"
 )
 
 const (
-	leftMeta = "{"
+	leftMeta  = "{"
 	rightMeta = "}"
-	backTick = "`"
-	eof = '‡'
+	backTick  = "`"
+	eof       = '‡'
 )
 
 const (
@@ -23,17 +23,17 @@ const (
 	itemEOF
 	itemLHS
 	itemRHS
-	itemEquals		// 5
-	itemLeftMeta	
-	itemRightMeta	
+	itemEquals // 5
+	itemLeftMeta
+	itemRightMeta
 	itemNumber
 	itemPipe
-	itemText		// 10
+	itemText // 10
 	itemBackTick
-	itemHereString	
+	itemHereString
 	itemFnStart
 	itemFnInside
-	itemEnv			// 15
+	itemEnv // 15
 )
 
 type itemType int
@@ -46,10 +46,10 @@ type item struct {
 }
 
 type lexer struct {
-	name string
-	input	string
+	name  string
+	input string
 	start int
-	pos int
+	pos   int
 	width int
 	items chan item
 }
@@ -60,11 +60,11 @@ func (i item) String() string {
 
 func lex(name, input string) (*lexer, chan item) {
 	l := &lexer{
-		name: name,
+		name:  name,
 		input: input,
 		items: make(chan item),
 	}
-	go l.run()	// run state machine
+	go l.run() // run state machine
 	return l, l.items
 }
 
@@ -87,7 +87,7 @@ func (l *lexer) backup() {
 }
 
 func (l *lexer) errorf(format string, args ...interface{}) statefn {
-	l.items <- item {
+	l.items <- item{
 		itemError,
 		fmt.Sprintf(format, args...),
 	}
@@ -267,13 +267,13 @@ type cmd func()
 
 type Op int
 
-func (p *parser)Push(fn func()) {
+func (p *parser) Push(fn func()) {
 	p.cl = append(p.cl, fn)
 }
 
 func (p *parser) Next() *item {
 	p.last = p.tok
-	p.tok = <- p.in
+	p.tok = <-p.in
 	return &p.tok
 }
 
@@ -282,13 +282,13 @@ func (p *parser) String() string {
 }
 
 type parser struct {
-	in chan item
-	cl cmdline
-	out chan func()
+	in        chan item
+	cl        cmdline
+	out       chan func()
 	last, tok item
 }
 
-func parse(i chan item) (*parser)  {
+func parse(i chan item) *parser {
 	p := &parser{
 		in: i,
 	}
@@ -296,11 +296,11 @@ func parse(i chan item) (*parser)  {
 	return p
 }
 
-var parseActs = map[itemType]func(p *parser) func() {
-	itemEnv:     parseEnv,
-	itemText:    parseCmd,
-	itemEquals:  parseEquals,
-	itemEOF:     nil,
+var parseActs = map[itemType]func(p *parser) func(){
+	itemEnv:    parseEnv,
+	itemText:   parseCmd,
+	itemEquals: parseEquals,
+	itemEOF:    nil,
 }
 
 func pl(i ...interface{}) {
@@ -322,7 +322,7 @@ func (p *parser) run() {
 		}
 		fmt.Println(p)
 		fn(p)()
-//		p.Push(fn(p))
+		//		p.Push(fn(p))
 	}
 }
 
@@ -351,7 +351,7 @@ func parseEquals(p *parser) func() {
 		fmt.Println("assign: crap RHS")
 		return nil
 	}
-	return func(){
+	return func() {
 		assign(&lhs, rhs)
 	}
 }
@@ -373,20 +373,24 @@ func extract(i item) item {
 
 func cmdexec(i item) {
 	switch i.val {
-	case "cd":   bcd(i)
-	case "echo": becho(i)
-	case "exit": bexit()
-	default: run(i)
+	case "cd":
+		bcd(i)
+	case "echo":
+		becho(i)
+	case "exit":
+		bexit()
+	default:
+		run(i)
 	}
 }
 
-func bcd (i item) {
-/*
-	if len(args) > 1 {
-		fmt.Println("usage: cd [dir]")
-		return
-	}
-*/
+func bcd(i item) {
+	/*
+		if len(args) > 1 {
+			fmt.Println("usage: cd [dir]")
+			return
+		}
+	*/
 	err := os.Chdir(i.val)
 	if err != nil {
 		fmt.Println(err)
@@ -420,7 +424,7 @@ func main() {
 	for s.Scan() {
 		l, item := lex("test", s.Text())
 		p = parse(item)
-	l = l
+		l = l
 	}
 	p = p
 	os.Exit(0)
