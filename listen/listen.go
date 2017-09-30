@@ -5,21 +5,21 @@
 package main
 
 import (
-	"fmt"
+	"bufio"
 	"flag"
+	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/exec"
-	"bufio"
 )
 import (
 	"github.com/as/mute"
 )
 
 const (
-	Prefix     = "listen: "
-	Debug      = false
+	Prefix = "listen: "
+	Debug  = false
 )
 
 var args struct {
@@ -27,7 +27,7 @@ var args struct {
 	k       bool
 	m       bool
 	a       int
-	n	string
+	n       string
 }
 
 var f *flag.FlagSet
@@ -39,8 +39,8 @@ func init() {
 	f.BoolVar(&args.v, "v", false, "")
 	f.BoolVar(&args.k, "k", false, "")
 	f.BoolVar(&args.m, "m", false, "")
-	f.IntVar(&args.a,  "a", 4096, "")
-	f.StringVar(&args.n,  "n", "tcp4", "")
+	f.IntVar(&args.a, "a", 4096, "")
+	f.StringVar(&args.n, "n", "tcp4", "")
 
 	err := mute.Parse(f, os.Args[1:])
 	if err != nil {
@@ -58,7 +58,7 @@ func main() {
 
 	srv := f.Args()[0]
 	cmd := f.Args()[1:]
-	
+
 	ln, err := listener(args.n, srv)
 	sysfatal(err)
 
@@ -73,12 +73,13 @@ func main() {
 func stream(ln net.Listener, cmd ...string) {
 	sem := make(chan bool, args.a)
 	for {
-		sem <- true 
+		sem <- true
 		go func(cfd net.Conn, err error) {
-			defer func() { <- sem }()
+			defer func() { <-sem }()
 			defer cfd.Close()
 			if err != nil {
-				printerr(err); return
+				printerr(err)
+				return
 			}
 			verb("accept:", cfd.RemoteAddr().String())
 			if len(cmd) == 0 {
@@ -106,23 +107,24 @@ func streammux(ln net.Listener, cmd ...string) {
 			mw := io.MultiWriter(pimpedwr...)
 			mrw := bufio.NewReadWriter(bufio.NewReader(mr), bufio.NewWriter(mw))
 			i = len(pimpedwr) - 1
-			pimped[p]=i
+			pimped[p] = i
 			pimper <- mrw
 		}
 	}()
 	for {
-		sem <- true 
+		sem <- true
 		go func(cfd net.Conn, err error) {
-			defer func() { <- sem }()
+			defer func() { <-sem }()
 			defer cfd.Close()
 			pimper <- cfd
-			lol := <- pimper
+			lol := <-pimper
 			if err != nil {
-				printerr(err); return
+				printerr(err)
+				return
 			}
 			verb("accept:", cfd.RemoteAddr().String())
 			if len(cmd) == 0 {
-			verb("accept:", cfd.RemoteAddr().String())
+				verb("accept:", cfd.RemoteAddr().String())
 				err := term3(cfd)
 				printerr(err)
 			} else {
@@ -147,13 +149,12 @@ func sysfatal(err error) {
 	os.Exit(1)
 }
 
-func listener(network string, srv string) (net.Listener, error){
+func listener(network string, srv string) (net.Listener, error) {
 	if srv != "file" {
 		return net.Listen(network, srv)
 	}
 	return net.FileListener(os.Stdin)
 }
-
 
 func verb(i ...interface{}) {
 	if args.v {
@@ -172,14 +173,14 @@ func term3(rw net.Conn) (err error) {
 		fin <- err
 	}()
 
-	func () {
+	func() {
 		verb("open: stdin|net")
 		defer verb("close: stdin|net")
 		if _, err := io.Copy(rw, os.Stdin); err != nil {
 			printerr("stdin|net", err)
 		}
 	}()
-	return <- fin
+	return <-fin
 }
 
 func run3(rw io.ReadWriter, cmd string, args ...string) (err error) {
@@ -200,7 +201,7 @@ func run3(rw io.ReadWriter, cmd string, args ...string) (err error) {
 	if err = c.Start(); err != nil {
 		return err
 	}
-	
+
 	go func() {
 		verb("open: net|cmd")
 		defer verb("close: net|cmd")
@@ -211,7 +212,7 @@ func run3(rw io.ReadWriter, cmd string, args ...string) (err error) {
 		fin <- err
 	}()
 
-	func () {
+	func() {
 		verb("open: cmd|net")
 		defer verb("close: cmd|net")
 		if _, err := io.Copy(rw, pr); err != nil {
@@ -219,14 +220,13 @@ func run3(rw io.ReadWriter, cmd string, args ...string) (err error) {
 		}
 	}()
 
-	if err := <- fin; err != nil {
+	if err := <-fin; err != nil {
 		printerr("net|cmd", err)
 	}
 	in.Close()
 	verb("cmd: moribound")
 	return c.Wait()
 }
-
 
 /*
  *	Below is UDP stuff. Experimental and not tested
@@ -295,7 +295,6 @@ type pkt struct {
 	src  *net.UDPAddr
 	data []byte
 }
-
 
 func println(v ...interface{}) {
 	fmt.Print(Prefix)
