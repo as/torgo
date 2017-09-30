@@ -1,43 +1,43 @@
 // Copyright 2015 "as". All rights reserved. The program and its corresponding
 // gotools package is governed by an MIT license.
 //
-// Wc counts lines, words, bytes, and runes 
+// Wc counts lines, words, bytes, and runes
 
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"flag"
 	"fmt"
 	"io"
-	"bufio"
 	"os"
-	"flag"
-	"unicode/utf8"
-	"bytes"
 	"sync"
+	"unicode/utf8"
 )
 
 import (
-	"github.com/as/mute"
 	"github.com/as/argfile"
+	"github.com/as/mute"
 )
 
 const (
-	Prefix = "wc: "
-	BufferSize = 2^16
+	Prefix     = "wc: "
+	BufferSize = 2 ^ 16
 )
 
 var args struct {
-	lines, words, runes, chars, x  bool
-	h, q bool
+	lines, words, runes, chars, x bool
+	h, q                          bool
 }
 
-func (t tally) String() string{
+func (t tally) String() string {
 	return t.name
 }
 
 type tally struct {
-	lines, words, runes, chars, x  uint64
-	name string
+	lines, words, runes, chars, x uint64
+	name                          string
 }
 
 // add adds tally2 to tally t
@@ -60,7 +60,7 @@ func init() {
 
 	f.BoolVar(&args.h, "h", false, "")
 	f.BoolVar(&args.q, "?", false, "")
-	
+
 	err := mute.Parse(f, os.Args[1:])
 	if err != nil {
 		printerr(err)
@@ -70,14 +70,17 @@ func init() {
 		return
 	}
 	if !args.lines {
-	if !args.words {
-	if !args.chars {
-	if !args.runes {
-		args.lines = true
-		args.words = true
-		args.chars = true
-	}}}}
-	
+		if !args.words {
+			if !args.chars {
+				if !args.runes {
+					args.lines = true
+					args.words = true
+					args.chars = true
+				}
+			}
+		}
+	}
+
 }
 
 func main() {
@@ -86,11 +89,11 @@ func main() {
 		os.Exit(0)
 	}
 	var (
-		wg        sync.WaitGroup
-		nfiles    int
+		wg      sync.WaitGroup
+		nfiles  int
 		totals  = &tally{name: "totals"}
 		countfn = count
-		donec = make(chan bool)
+		donec   = make(chan bool)
 	)
 	if args.x {
 		countfn = countx
@@ -99,14 +102,22 @@ func main() {
 	go func() {
 		for t := range report {
 			if args.x {
-				fmt.Printf("%10d",t.x)
+				fmt.Printf("%10d", t.x)
 				fmt.Printf(" %s\n", t)
 				return
 			}
-			if args.lines {fmt.Printf("%10d",t.lines)}
-			if args.words {fmt.Printf("%10d",t.words)}
-			if args.chars {fmt.Printf("%10d",t.chars)}
-			if args.runes {fmt.Printf("%10d",t.runes)}
+			if args.lines {
+				fmt.Printf("%10d", t.lines)
+			}
+			if args.words {
+				fmt.Printf("%10d", t.words)
+			}
+			if args.chars {
+				fmt.Printf("%10d", t.chars)
+			}
+			if args.runes {
+				fmt.Printf("%10d", t.runes)
+			}
 			fmt.Printf(" %s\n", t)
 		}
 		donec <- true
@@ -132,33 +143,33 @@ func main() {
 		report <- totals
 	}
 	close(report)
-	<- donec
+	<-donec
 }
 
 func count(in io.Reader) (*tally, error) {
-		t := new(tally)
-		r := bufio.NewScanner(in)
-		var spaces = []byte{' ', '	'}
-		//splitfn := func(data []byte, atEOF bool)(advance int, token []byte, err error)
-		for r.Scan() {
-			l := r.Bytes()
-			t.chars += uint64(len(l))
-			t.words += uint64(bytes.Count(l, spaces))
-			t.runes += uint64(utf8.RuneCount(l))
-			t.lines++
-		}
-		return t, nil
+	t := new(tally)
+	r := bufio.NewScanner(in)
+	var spaces = []byte{' ', '	'}
+	//splitfn := func(data []byte, atEOF bool)(advance int, token []byte, err error)
+	for r.Scan() {
+		l := r.Bytes()
+		t.chars += uint64(len(l))
+		t.words += uint64(bytes.Count(l, spaces))
+		t.runes += uint64(utf8.RuneCount(l))
+		t.lines++
+	}
+	return t, nil
 }
 
 func countx(in io.Reader) (*tally, error) {
-		var err error
-		megabuffer := make([]byte, 1024*1024)
-		t := new(tally)
-		for err == nil {
-			_, err = in.Read(megabuffer)
-			t.x++
-		}
-		return t, nil
+	var err error
+	megabuffer := make([]byte, 1024*1024)
+	t := new(tally)
+	for err == nil {
+		_, err = in.Read(megabuffer)
+		t.x++
+	}
+	return t, nil
 }
 
 func efatal(err error) {
@@ -178,12 +189,12 @@ func eprint(err error) bool {
 
 func println(v ...interface{}) {
 	fmt.Print(Prefix)
-	fmt.Println(v ...) 
+	fmt.Println(v...)
 }
 
-func printerr(v ...interface{}) { 
+func printerr(v ...interface{}) {
 	fmt.Fprint(os.Stderr, Prefix)
-	fmt.Fprintln(os.Stderr, v ...) 
+	fmt.Fprintln(os.Stderr, v...)
 }
 
 func usage() {
@@ -224,4 +235,3 @@ BUGS
 	Doesn't count broken runes
 `)
 }
-
