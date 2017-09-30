@@ -49,11 +49,10 @@ var (
 	_KeyUsage_index_7 = [...]uint8{0, 20}
 )
 
-
-func (i KeyUsage) String() string{
+func (i KeyUsage) String() string {
 	s := ""
 	sep := ""
-	for m := 1; m != 0; m <<= 2{
+	for m := 1; m != 0; m <<= 2 {
 		if j := i & KeyUsage(m); j != 0 {
 			s += sep + strings.TrimPrefix(j.String2(), "KeyUsage")
 			sep = " "
