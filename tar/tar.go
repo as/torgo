@@ -1,7 +1,5 @@
 // Copyright 2015 "as". All rights reserved. Torgo is governed
-// the same BSD license as the go programming language.
-//
-// Walk traverses directory trees, printing visited files
+// the same BSD license as the Go programming language.
 
 package main
 
@@ -26,15 +24,21 @@ var f *flag.FlagSet
 
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
-	f.BoolVar(&args.c,  "c",  true,  "")
-	f.BoolVar(&args.x,  "x",  false, "")
-	f.BoolVar(&args.v,  "v",  false, "")
-	f.BoolVar(&args.t,  "t",  false, "")
-	f.StringVar(&args.f, "f", "",  "")
+	f.BoolVar(&args.c, "c", true, "")
+	f.BoolVar(&args.x, "x", false, "")
+	f.BoolVar(&args.v, "v", false, "")
+	f.BoolVar(&args.t, "t", false, "")
+	f.StringVar(&args.f, "f", "", "")
+	f.BoolVar(&args.h, "h", false, "")
+	f.BoolVar(&args.q, "?", false, "")
 	err := mute.Parse(f, os.Args[1:])
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
+	}
+	if args.h || args.q {
+		usage()
+		os.Exit(0)
 	}
 }
 
@@ -100,35 +104,38 @@ func readtar(in io.Reader) {
 		tr := tar.NewReader(in)
 		for {
 			hdr, err := tr.Next()
-			if err == io.EOF{
+			if err == io.EOF {
 				break
 			}
-			if err != nil{
-				log.Printf("error:", err)
+			if err != nil {
+				log.Printf("nexts:", err)
 				continue
 			}
 			if args.t {
-				fmt.Println(filepath.FromSlash(hdr.Name))
+				fmt.Println("x", filepath.FromSlash(hdr.Name))
 				continue
 			}
 			if args.v {
 				fmt.Fprintln(os.Stderr, hdr.Name)
 			}
-			os.MkdirAll(filepath.Dir(hdr.Name), 0700)
-	
-			fd, err := os.Create(hdr.Name)
-			if err != nil {
-				return err
-			}
-			if _, err = io.Copy(fd, tr); err != nil {
+			if fi := hdr.FileInfo(); fi.IsDir() {
+				os.MkdirAll(hdr.Name, fi.Mode())
+			} else {
+				log.Println(fi)
+				fd, err := os.Create(hdr.Name)
+				if err != nil {
+					return err
+				}
+				if _, err = io.Copy(fd, tr); err != nil {
+					fd.Close()
+					return err
+				}
 				fd.Close()
-				return err
 			}
-			fd.Close()
 		}
 		return nil
 	}()
-	if err != nil{
+	if err != nil {
 		log.Printf("error: %s", err)
 	}
 }
