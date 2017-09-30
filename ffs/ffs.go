@@ -1,8 +1,9 @@
 package main
+
 /*
-	go build ffs.go && cp ffs /bin/ && 
+	go build ffs.go && cp ffs /bin/ &&
 		cat /home/Manifest.xml | ffs /tmp/d1 | rc
-	GOOS=windows go build ffs.go 
+	GOOS=windows go build ffs.go
 */
 
 import (
@@ -10,8 +11,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"runtime"
+	"strings"
 )
 
 import (
@@ -21,21 +22,21 @@ import (
 const (
 	Prefix     = "ffs: "
 	BufferSize = 65535
-	Debug = false
+	Debug      = false
 )
 
 type action func(*decoder) action
 
 type decoder struct {
-	err		error
+	err error
 
-	x       *xml.Decoder
-	token    xml.Token
+	x     *xml.Decoder
+	token xml.Token
 	selem xml.StartElement
 	eelem xml.EndElement
-	attr xml.Attr
+	attr  xml.Attr
 
-	pc int
+	pc    int
 	depth int
 	spool []*token
 	stack []string
@@ -67,15 +68,15 @@ func main() {
 	}
 
 	d := &decoder{
-		x:       xml.NewDecoder(os.Stdin),
+		x: xml.NewDecoder(os.Stdin),
 	}
 
-	Tree = &Node{ name: a[0] }
-	Tree.dad = Tree	
+	Tree = &Node{name: a[0]}
+	Tree.dad = Tree
 	tp = Tree
 
 	auxinit()
-	for state := begin; state != nil; d.pc++{
+	for state := begin; state != nil; d.pc++ {
 		state = state(d)
 	}
 	dumpcmd(d)
@@ -84,30 +85,30 @@ func main() {
 }
 
 //
-// Second-order auxillary actions. 
+// Second-order auxillary actions.
 // Called by the decoder
 //
 
 func auxinit() {
 
-	auxfn = map[string]action {
-	"Begin":        noop,
-	"Err":          noop,
-	"EOF":          noop,
-	"StartElement": remkdir,
-	"EndElement":   repopdir,
-	"EmptyElement": emptyelement,
-	"CharData":     noop,
-	"Comment":      noop,
-	"Directive":    noop,
-	"ProcInst":     noop,
-	"Attribute":	rattr,
-	"NilAttrName":	rbsattr,
-	"NilAttrValue":	rbadattr,
+	auxfn = map[string]action{
+		"Begin":        noop,
+		"Err":          noop,
+		"EOF":          noop,
+		"StartElement": remkdir,
+		"EndElement":   repopdir,
+		"EmptyElement": emptyelement,
+		"CharData":     noop,
+		"Comment":      noop,
+		"Directive":    noop,
+		"ProcInst":     noop,
+		"Attribute":    rattr,
+		"NilAttrName":  rbsattr,
+		"NilAttrValue": rbadattr,
 	}
 }
 
-func remkdir(d *decoder) action{
+func remkdir(d *decoder) action {
 	node := mknode(d.Top())
 	tp.AddKid(node)
 	tp = node
@@ -124,30 +125,29 @@ func emptyelement(d *decoder) action {
 	return classify
 }
 
-func rattr(d *decoder) action{
+func rattr(d *decoder) action {
 	tp.attrs = append(tp.attrs, d.attr)
 	return nil
 }
 
-func rbadattr(d *decoder) action{
+func rbadattr(d *decoder) action {
 	debugerr("attr: no value: ", d.attr.Name.Local)
 	return nil
 }
 
-func rbsattr(d *decoder) action{
+func rbsattr(d *decoder) action {
 	debugerr("WOW!: ", d.attr)
 	return nil
 }
 
-
 var Tree, tp *Node
 
 type Node struct {
-	name string
+	name  string
 	attrs []xml.Attr
-	id int 
-	kids []*Node
-	dad *Node
+	id    int
+	kids  []*Node
+	dad   *Node
 }
 
 func (n *Node) String() string {
@@ -165,7 +165,7 @@ func (n *Node) NKids() int {
 
 func (n *Node) Runt() *Node {
 	i := n.NKids() - 1
-	if i < 0  {
+	if i < 0 {
 		return nil
 	}
 	return n.kids[i]
@@ -176,8 +176,8 @@ func mknode(s string) *Node {
 }
 
 //
-// dumpcmd prints commands to create a file 
-// system representation of the XML. 
+// dumpcmd prints commands to create a file
+// system representation of the XML.
 // The tree is walked thrice.
 //
 
@@ -212,7 +212,7 @@ func dumpcmd(d *decoder) {
 		d.depth++
 		for _, v := range n.attrs {
 			d.Println(attrecho(v))
-			v=v
+			v = v
 		}
 	}
 
@@ -220,14 +220,14 @@ func dumpcmd(d *decoder) {
 		d.depth--
 		d.Println("cd ..")
 	}
-	
+
 	// Print
-	walk(Tree, func(n *Node){
+	walk(Tree, func(n *Node) {
 		downfn(n)
-		if n == n.dad.Runt() && n.dad != Tree{
+		if n == n.dad.Runt() && n.dad != Tree {
 			upfn(n)
 		}
-		if n.kids == nil  {
+		if n.kids == nil {
 			upfn(n)
 		}
 	})
@@ -243,12 +243,18 @@ func attrecho(a xml.Attr) string {
 
 func (d *decoder) tokenize(x interface{}) (t token) {
 	switch z := x.(type) {
-	case xml.StartElement: t = token{"StartElement", startelement, x}
-	case xml.EndElement:   t = token{"EndElement",   endelement,   x}
-	case xml.CharData:     t = token{"CharData",     chardata,     x}
-	case xml.Comment:      t = token{"Comment",      comment,      x}
-	case xml.Directive:    t = token{"Directive",    directive,    x}
-	case xml.ProcInst:     t = token{"ProcInst",     procinst,     x}
+	case xml.StartElement:
+		t = token{"StartElement", startelement, x}
+	case xml.EndElement:
+		t = token{"EndElement", endelement, x}
+	case xml.CharData:
+		t = token{"CharData", chardata, x}
+	case xml.Comment:
+		t = token{"Comment", comment, x}
+	case xml.Directive:
+		t = token{"Directive", directive, x}
+	case xml.ProcInst:
+		t = token{"ProcInst", procinst, x}
 	case string:
 		s := string(z)
 		fn, ok := auxfn[s]
