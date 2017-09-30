@@ -12,6 +12,7 @@ import (
 import (
 	"github.com/as/mute"
 )
+
 const (
 	Prefix = "time: "
 )
@@ -45,7 +46,9 @@ func main() {
 		os.Exit(0)
 	}
 	a := f.Args() // Remaining non-flag args
-		if len(a) == 0 { duddyout(nil)}
+	if len(a) == 0 {
+		duddyout(nil)
+	}
 
 	cmd := exec.Command(a[0], a[1:]...)
 	cmd.Stdout = os.Stdout
@@ -53,19 +56,21 @@ func main() {
 	cmd.Stderr = os.Stderr
 	t1 := time.Now()
 	err := cmd.Start()
-		if err != nil { duddyout(err)}
+	if err != nil {
+		duddyout(err)
+	}
 
 	err = cmd.Wait()
 	t2 := time.Now()
 
-	if err != nil {	// TODO: fix assumption
+	if err != nil { // TODO: fix assumption
 		printerr(err)
 		os.Exit(0)
 	}
 
 	stat := cmd.ProcessState
 
-	fmt.Fprintf(os.Stderr, "user=%v sys=%v real=%v pid=%v\n", 
+	fmt.Fprintf(os.Stderr, "user=%v sys=%v real=%v pid=%v\n",
 		stat.UserTime(),
 		stat.SystemTime(),
 		t2.Sub(t1),
@@ -73,9 +78,9 @@ func main() {
 	)
 }
 
-func duddyout(err error){
+func duddyout(err error) {
 	if err != nil {
-	printerr(err)
+		printerr(err)
 	}
 	os.Exit(Fail)
 }
@@ -89,7 +94,6 @@ func printerr(v ...interface{}) {
 	fmt.Fprint(os.Stderr, Prefix)
 	fmt.Fprintln(os.Stderr, v...)
 }
-
 
 func usage() {
 	fmt.Println(`
