@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"net/http"
-	"log"
 	"io"
+	"log"
+	"net/http"
 	"net/url"
+	"os"
 	"path"
 )
 
@@ -16,21 +16,22 @@ import (
 )
 
 const Prefix = "hget: "
+
 var args struct {
 	h, q bool
-	v bool
-	a bool
+	v    bool
+	a    bool
 }
 var f *flag.FlagSet
-
 
 func main() {
 	out := io.Writer(os.Stdout)
 	if args.h || args.q {
-		usage(); os.Exit(0)
+		usage()
+		os.Exit(0)
 	}
 	resp, err := http.Get(f.Args()[0])
-	if err != nil{
+	if err != nil {
 		log.Fatalln(err)
 	}
 	defer resp.Body.Close()
@@ -42,13 +43,13 @@ func main() {
 		defer fd.Close()
 		out = fd
 	}
-	if _, err = io.Copy(out, resp.Body); err != nil{
+	if _, err = io.Copy(out, resp.Body); err != nil {
 		log.Fatalln(err)
 	}
 }
 
-func no(err error){
-	if err != nil{
+func no(err error) {
+	if err != nil {
 		log.Fatalln(err)
 	}
 }
