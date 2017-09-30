@@ -23,8 +23,8 @@ var arg struct {
 	n, v       bool
 	d          string
 	e          string
-	h bool
-	q bool
+	h          bool
+	q          bool
 }
 
 var f *flag.FlagSet
@@ -63,7 +63,7 @@ func Pass() (string, error) {
 }
 
 func Signers() (signers []ssh.Signer, err error) {
-	if arg.d == ""{
+	if arg.d == "" {
 		return nil, fmt.Errorf("no ssh key path specified")
 	}
 	buf, err := ioutil.ReadFile(arg.d)
@@ -120,10 +120,10 @@ func main() {
 	config := &ssh.ClientConfig{
 		User: arg.u,
 	}
-	if arg.d != ""{
+	if arg.d != "" {
 		config.Auth = append(config.Auth, ssh.PublicKeysCallback(Signers))
 	}
-	if arg.p != ""{
+	if arg.p != "" {
 		config.Auth = append(config.Auth, ssh.PasswordCallback(Pass))
 	} else {
 		panic("no")
@@ -183,7 +183,7 @@ func interactive(session *ssh.Session) error {
 	}
 	return nil
 }
-func command(s *ssh.Session, cmd string) (error){
+func command(s *ssh.Session, cmd string) error {
 	return s.Run(cmd)
 }
 func printerr(v ...interface{}) {
@@ -232,4 +232,5 @@ EXAMPLES
 	With command line arguments
 
 	ssh -s tcp!10.2.77.43!3389 -u root -p insecurity
-`)}
+`)
+}
