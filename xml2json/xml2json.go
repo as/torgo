@@ -68,7 +68,7 @@ func xml2json(fd io.Reader) {
 	d, err := x2j.Convert(fd)
 	d2 := new(bytes.Buffer)
 	json.Indent(d2, d.Bytes(), " ", "   ")
-	if err != nil{
+	if err != nil {
 		printerr(err)
 		os.Exit(1)
 	}
