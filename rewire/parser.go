@@ -89,7 +89,7 @@ func (p *parser) parseFinal() error {
 	defer un(trace("parseFinal"))
 
 	// Let exec handle the last argument
-	for p.tok != ""{
+	for p.tok != "" {
 		p.finalcmd = append(p.finalcmd, p.tok)
 		p.tok = p.next()
 	}
