@@ -17,6 +17,7 @@ import (
 )
 
 const Prefix = "gzip: "
+
 var (
 	args struct {
 		h, q                   bool
@@ -24,6 +25,7 @@ var (
 	}
 	f *flag.FlagSet
 )
+
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
 	f.BoolVar(&args.d, "d", false, "")
@@ -84,10 +86,10 @@ func worker() {
 	}
 }
 
-func toobig(file string) bool{ return false}
-func clash(file string)bool{ return false}
+func toobig(file string) bool { return false }
+func clash(file string) bool  { return false }
 
-func decompress(file string)  {
+func decompress(file string) {
 	fd, err := os.Open(file)
 	ck(err)
 	defer fd.Close()
@@ -99,41 +101,41 @@ func decompress(file string)  {
 	if clash(file) {
 		log.Printf("decompress: name conflict: %q\n", file)
 		return
-			}
+	}
 	errc := make(chan error)
 	workin <- &Request{fd: fd, replyto: errc}
 	err = <-errc
-	if err != nil{
+	if err != nil {
 		log.Printf("decompress: %s\n", err)
 	}
 }
 
-func compress(file string){
+func compress(file string) {
 }
 
 func main() {
 	go worker()
-	if len(f.Args()) == 0{
-		if args.d{
+	if len(f.Args()) == 0 {
+		if args.d {
 			zr, err := gzip.NewReader(os.Stdin)
 			ck(err)
 			defer zr.Close()
 			io.Copy(os.Stdout, zr)
 		} else {
-			zw:= gzip.NewWriter(os.Stdout)
+			zw := gzip.NewWriter(os.Stdout)
 			defer zw.Close()
 			io.Copy(zw, os.Stdin)
 		}
 		os.Exit(0)
 	}
-	
+
 	log.Fatalln("unfinished program: only supports stdin | stdout right now")
 
 	alg := compress
 	if args.d {
 		alg = decompress
 	}
-	
+
 	var wg sync.WaitGroup
 	paths := f.Args()
 	for _, v := range paths {
@@ -153,8 +155,8 @@ func main() {
 	wg.Wait()
 }
 
-func ck(err error){
-	if err != nil{
+func ck(err error) {
+	if err != nil {
 		log.Fatalln(err)
 	}
 }
