@@ -1,4 +1,5 @@
 package main
+
 // This package operates on Microsoft Cab files. It's
 // unfinished. The structure is represented with a
 // pair of dynamic and fixed size structs.
@@ -6,19 +7,19 @@ package main
 // Note: Work-in progress
 
 import (
-	"encoding/binary"
+	"bufio"
+	"bytes"
 	"compress/flate"
+	"encoding/binary"
 	"fmt"
 	"io"
-	"os"
-	"reflect"
-	"time"
-	"bufio"
-	"strings"
-	"bytes"
-	"log"
 	"io/ioutil"
+	"log"
+	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
+	"time"
 )
 
 const (
@@ -28,46 +29,45 @@ const (
 )
 
 const (
-	MaxBloatCab	  = 60000
-	MaxBloatDir	  = 255
+	MaxBloatCab   = 60000
+	MaxBloatDir   = 255
 	MaxBloatBlock = 255
 )
 
 const (
 	ReadOnly Bitflag = 0x01
-	Hidden   = 0x02
-	System   = 0x04
-	Modified = 0x20
-	AutoRun  = 0x40
-	Unicode  = 0x80 // Ignored. UTF8 only.
+	Hidden           = 0x02
+	System           = 0x04
+	Modified         = 0x20
+	AutoRun          = 0x40
+	Unicode          = 0x80 // Ignored. UTF8 only.
 )
 
 type Bitflag uint16
 
 func (bf Bitflag) In(b uint16) bool {
 	fmt.Printf("%x\n", b)
-	return b & uint16(bf) != 0
+	return b&uint16(bf) != 0
 }
-
 
 type Cab struct {
 	Head
 	Bloat
-	Res          []byte //  
-	LCab, LDisk  []byte //  Optional
-	RCab, RDisk  []byte	//  
+	Res         []byte //
+	LCab, LDisk []byte //  Optional
+	RCab, RDisk []byte //
 
-	Dirs     []Dir
-	Fids     []Fid
+	Dirs []Dir
+	Fids []Fid
 
 	Mz io.ReadCloser
 }
 
 type Head struct {
 	Sig        [4]byte
-	R1          uint32
-	Size,   R2  uint32
-	Fidpos, R3  uint32
+	R1         uint32
+	Size, R2   uint32
+	Fidpos, R3 uint32
 	Ver
 	NDirs, NFids uint16
 	Flags        uint16
@@ -79,9 +79,9 @@ type Ver struct {
 }
 
 type Bloat struct {
-	Cab   uint16  // Cab
-	Dir    uint8  // Dirs
-	Block  uint8  // and Blocks
+	Cab   uint16 // Cab
+	Dir   uint8  // Dirs
+	Block uint8  // and Blocks
 }
 
 type Dir struct {
@@ -90,31 +90,31 @@ type Dir struct {
 }
 
 type HDir struct {
-	Pos     int32   // distance to block⁰
-	NBlocks int16   // no. blocks in Dir
-	AlgID   int16   // compression type
+	Pos     int32 // distance to block⁰
+	NBlocks int16 // no. blocks in Dir
+	AlgID   int16 // compression type
 }
 
 // Fid identifies a file in a Cab. Fid⁰ starts at Head.Fidpos
-// Fid¹-Fidⁿ follow Fid⁰ contiguously; n is the number 
+// Fid¹-Fidⁿ follow Fid⁰ contiguously; n is the number
 // of expected files in the Cab.
 type Fid struct {
 	HFid
 	Name   []byte
 	Blocks []*Block
-	Mz MsReader
+	Mz     MsReader
 }
 type HFid struct {
 	Size, Pos uint32 // File's size and position
 	DirPos    uint16 // Dir index (or overloaded bit rot crap)
-	Stamp	         // 4 bytes
-	Flags uint16
+	Stamp            // 4 bytes
+	Flags     uint16
 }
 
 type Block struct {
 	HBlock
-	Hole         []byte // dubious bit goulash, size Blockholes
-	ZData        []byte // compressed data
+	Hole  []byte // dubious bit goulash, size Blockholes
+	ZData []byte // compressed data
 }
 type HBlock struct {
 	CRC          int32
@@ -130,32 +130,32 @@ type Reader struct {
 	*Cab
 }
 
-type Zipper interface  {
+type Zipper interface {
 	io.ReadCloser
 	flate.Resetter
 }
 type MsReader struct {
 	sig [2]byte // omg so cool!
 	br  io.Reader
-	zr Zipper
+	zr  Zipper
 }
 
-type cacheReader struct{
+type cacheReader struct {
 	*bytes.Buffer
 	b []byte
 }
 
-func newCacheReader() *cacheReader{
+func newCacheReader() *cacheReader {
 	return &cacheReader{Buffer: new(bytes.Buffer)}
 }
 
-func (cr *cacheReader) Read(p []byte) (n int, err error){
+func (cr *cacheReader) Read(p []byte) (n int, err error) {
 	panic("fuc")
-	const maxmemo = 1<<15
+	const maxmemo = 1 << 15
 	n, err = cr.Buffer.Read(p)
-	if n > 0{
+	if n > 0 {
 		cr.b = append(cr.b, p[:n]...)
-		if over := len(cr.b)-maxmemo; over > 0{
+		if over := len(cr.b) - maxmemo; over > 0 {
 			println("overlfow", over)
 			cr.b = cr.b[over:]
 		}
@@ -163,7 +163,7 @@ func (cr *cacheReader) Read(p []byte) (n int, err error){
 	return n, err
 }
 
-func (cr *cacheReader) Cache() []byte{
+func (cr *cacheReader) Cache() []byte {
 	return cr.b
 }
 
@@ -173,16 +173,16 @@ const (
 
 func (m *MsReader) Read(p []byte) (n int, err error) {
 	fmt.Println("MsReader.Read: Enter\n")
-	defer func(){ fmt.Printf("MsReader.Read: %q\n", p[:n]) }()
+	defer func() { fmt.Printf("MsReader.Read: %q\n", p[:n]) }()
 	defer m.zr.Reset(m.br, nil)
 	if n, err = m.br.Read(m.sig[:]); err != nil {
 		return n, err
 	}
-	if m.sig[:]	 != nil {
+	if m.sig[:] != nil {
 		fmt.Printf("not good %x", m.sig)
 		fmt.Printf("read %d bytes", n)
 	}
-	
+
 	// TODO: Bug: wrong n bytes read returned
 	return m.zr.Read(p)
 }
@@ -199,23 +199,23 @@ func main() {
 	r := NewReader(os.Stdin)
 	chatty := func(do func() error) {
 		if e := do(); e != nil {
-			fmt.Println("err",e)
+			fmt.Println("err", e)
 		}
 	}
 	chatty(r.ReadHead)
 	Dump(r.Head)
 	chatty(r.ReadRes)
-		fmt.Println("e chatty(r.ReadRes)")
+	fmt.Println("e chatty(r.ReadRes)")
 	Dump(r.Bloat)
-		fmt.Println("e chatty(Dump(r.Bloat))")
+	fmt.Println("e chatty(Dump(r.Bloat))")
 	fmt.Printf("s %s\n", r.Res)
-	
+
 	fmt.Println("Reading Dirs")
 	for i := uint16(0); i < r.NDirs; i++ {
 		chatty(r.ReadDir)
 		fmt.Printf("s %#v\nh %#v", r.Dirs, r.Bloat.Dir)
 	}
-	
+
 	fmt.Println("Reading Fids")
 	for i := uint16(0); i < r.NFids; i++ {
 		fmt.Println("Reading Fids: ", i, "/", r.NFids)
@@ -223,28 +223,28 @@ func main() {
 		Dump(r.Fids[i].HFid)
 		fmt.Printf("s %#s %s\n", r.Fids[i].Name, r.Fids[i].Stamp)
 	}
-	
+
 	fmt.Printf("Cab header: %#v\n", r.Cab)
 
 	fmt.Println("Reading Fid Blocks")
 	zbuf := new(bytes.Buffer)
 	plaintext := new(bytes.Buffer)
 	offset := 0
-	
+
 	fmt.Printf("\n\nCollecting compressed data")
 	for _, dir := range r.Dirs {
 		zbuf.ReadFrom(excise(r, int(dir.NBlocks)))
 		fmt.Printf("compressed data: (len=%d) \n\n", zbuf.Len())
 	}
 	log.Printf("zbuf length is: %d", zbuf.Len())
-	
-	for zbuf.Len() > 0{
+
+	for zbuf.Len() > 0 {
 		zr := flate.NewReaderDict(zbuf, history(plaintext))
 		n, err := plaintext.ReadFrom(zr)
 		log.Printf("plaintext grows: %d", n)
-		log.Println("io.Copy:",n,err)
+		log.Println("io.Copy:", n, err)
 		log.Printf("compressed data: (len=%d) \n\n", zbuf.Len())
-		if err != nil{
+		if err != nil {
 			log.Fatalln(err)
 		}
 	}
@@ -252,52 +252,52 @@ func main() {
 		name := strings.TrimSpace(strings.Trim(string(v.Name), "\x00"))
 		log.Printf("fid %d (%s) value=%#v\n", i, name, v)
 		log.Println("offset = %d (%x)\n", offset, offset)
-	
+
 		log.Printf("plaintext/vsize = %d/%d\n", plaintext.Len(), v.Size)
 		log.Printf("file #%d %q (%d bytes)\n", i, name, v.Size)
 		os.MkdirAll(filepath.Dir(name), 0777)
 		offset += int(v.Size)
 		log.Printf("plaintext buffer / file size = %d / %d\n", plaintext.Len(), v.Size)
 		fb := plaintext.Next(int(v.Size))
-		if len(fb) == 0{
+		if len(fb) == 0 {
 			log.Fatalln("Zero length file")
 		}
 		err := ioutil.WriteFile(name, fb, 0777)
-		if err != nil{
+		if err != nil {
 			log.Fatalln("writefile:", err)
 		}
-		
+
 		//if err := r.ReadBlock(&r.Fids[i]); err != nil {
 		//	fmt.Println("err", err)
 		//}
 	}
 }
 
-func history(b *bytes.Buffer) []byte{
+func history(b *bytes.Buffer) []byte {
 	m := b.Bytes()
 	over := len(m) - 1<<15
-	if over > 0{
+	if over > 0 {
 		return m[over:]
 	}
 	return m
 }
 
-func excise(r io.Reader, nblocks int) (zbuf *bytes.Buffer){
+func excise(r io.Reader, nblocks int) (zbuf *bytes.Buffer) {
 	zbuf = new(bytes.Buffer)
-	for i := 0; i < nblocks; i++{
+	for i := 0; i < nblocks; i++ {
 		log.Printf("block %d\n", i)
 		b := &block{}
 		err := b.ReadBinary(r)
 		log.Printf("block: %#v\n", b)
-		if err != nil{
+		if err != nil {
 			log.Printf("block.ReadBinary: %s\n", err)
 		}
 		n, err := zbuf.ReadFrom(io.LimitReader(r, int64(b.zsize-2)))
 		log.Println("zbuf.ReadFrom read", n)
-		if err != nil{
+		if err != nil {
 			panic(err)
 		}
-		
+
 	}
 	return zbuf
 }
@@ -306,10 +306,10 @@ func excise(r io.Reader, nblocks int) (zbuf *bytes.Buffer){
 
 var (
 	ZDirReader io.ReadCloser
-	ZDirInput *bytes.Buffer
+	ZDirInput  *bytes.Buffer
 )
 
-func init(){
+func init() {
 	ZDirInput = new(bytes.Buffer)
 	ZDirReader = flate.NewReader(ZDirInput)
 }
@@ -321,11 +321,11 @@ func NewReader(r io.Reader) *Reader {
 	}
 }
 
-func (r *Reader)ReadTo(i interface{}) (err error) {
+func (r *Reader) ReadTo(i interface{}) (err error) {
 	return binary.Read(r, binary.LittleEndian, i)
 }
 
-func (r *Reader)ReadHead() (err error) {
+func (r *Reader) ReadHead() (err error) {
 	err = r.ReadTo(&r.Cab.Head)
 	if err != nil {
 		return err
@@ -333,7 +333,7 @@ func (r *Reader)ReadHead() (err error) {
 	return checkHead(&r.Cab.Head)
 }
 
-func (r *Reader)ReadDir() (err error) {
+func (r *Reader) ReadDir() (err error) {
 	d := Dir{}
 	if err = r.ReadTo(&d.HDir); err != nil {
 		return err
@@ -378,7 +378,7 @@ func (r *Reader) ReadBlock(f *Fid) (err error) {
 	f.Mz = *NewMsReader(r)
 	buf2 := make([]byte, f.Size)
 	Dump(b.HBlock)
-	
+
 	for i := 0; i < int(f.Size); i++ {
 		_, err := f.Mz.Read(buf2)
 		if err != nil {
@@ -390,24 +390,24 @@ func (r *Reader) ReadBlock(f *Fid) (err error) {
 
 func (r *Reader) ReadRes() (err error) {
 	var (
-		c   = r.Cab
-		fl  = c.Flags
+		c  = r.Cab
+		fl = c.Flags
 	)
 	if HasRes.In(fl) {
 		if err = r.ReadTo(&c.Bloat); err != nil {
 			return err
 		}
 		c.Res = make([]byte, int(c.Bloat.Cab))
-		if _, err = io.ReadFull(r, c.Res); err!=nil {
+		if _, err = io.ReadFull(r, c.Res); err != nil {
 			return err
 		}
 	}
 	if HasPrev.In(fl) {
-		c.LCab,  err = r.ReadBytes(0)
+		c.LCab, err = r.ReadBytes(0)
 		c.LDisk, err = r.ReadBytes(0)
 	}
 	if HasNext.In(fl) {
-		c.RCab,  err = r.ReadBytes(0)
+		c.RCab, err = r.ReadBytes(0)
 		c.RDisk, err = r.ReadBytes(0)
 	}
 	return err
@@ -415,12 +415,16 @@ func (r *Reader) ReadRes() (err error) {
 
 func checkBloat(c *Cab) error {
 	switch nb := c.Bloat; {
-	case uint32(nb.Cab)   > c.Size: fallthrough
-	case uint32(nb.Dir)   > c.Size: fallthrough
+	case uint32(nb.Cab) > c.Size:
+		fallthrough
+	case uint32(nb.Dir) > c.Size:
+		fallthrough
 	case uint32(nb.Block) > c.Size:
 		return fmt.Errorf("restab: buffer points beyond cab")
-	case nb.Cab   > MaxBloatCab:   fallthrough
-	case nb.Dir   > MaxBloatDir:   fallthrough
+	case nb.Cab > MaxBloatCab:
+		fallthrough
+	case nb.Dir > MaxBloatDir:
+		fallthrough
 	case nb.Block > MaxBloatBlock:
 		return fmt.Errorf("restab: buffer points beyond brain")
 	case HasRes.In(c.Flags) && nb.Cab != 0:
