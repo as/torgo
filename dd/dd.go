@@ -22,7 +22,7 @@ var args struct {
 	h, q               bool
 }
 
-func init(){
+func init() {
 	log.SetFlags(0)
 	log.SetPrefix("dd: ")
 }
@@ -45,7 +45,7 @@ func init() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if args.h || args.q{
+	if args.h || args.q {
 		usage()
 		os.Exit(0)
 	}
@@ -57,7 +57,7 @@ func init() {
 		args.iseek = args.seek
 		args.oseek = args.seek
 	}
-	if len(f.Args()) > 0{
+	if len(f.Args()) > 0 {
 		log.Fatalln("extra arguments: %s", f.Args())
 	}
 }
