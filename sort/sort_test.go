@@ -12,7 +12,6 @@ import (
 	"github.com/as/xo"
 )
 
-
 func run(t *testing.T, in, fl, x, k, ex string) {
 	r, err := xo.NewReaderString(strings.NewReader(in), fl, x)
 	if err != nil {
@@ -48,16 +47,18 @@ func run(t *testing.T, in, fl, x, k, ex string) {
 	}
 }
 
-func TestGoFunc(t *testing.T)    { run(t,  DPAT, "i", `/func/,/\n\}\n/`, "", ADPT) }
-func TestGoFuncKey(t *testing.T) { run(t,  DPAT, "i", `/func/,/\n\}\n/`, `ln\(".`, DTPA)}
-func TestAlphabet(t *testing.T)  { run(t,  "dfcsjqerptyuiahlgkzxvmbnwo", "i", `/./`, ``, "abcdefghijklmnopqrstuvwxyz")}
+func TestGoFunc(t *testing.T)    { run(t, DPAT, "i", `/func/,/\n\}\n/`, "", ADPT) }
+func TestGoFuncKey(t *testing.T) { run(t, DPAT, "i", `/func/,/\n\}\n/`, `ln\(".`, DTPA) }
+func TestAlphabet(t *testing.T) {
+	run(t, "dfcsjqerptyuiahlgkzxvmbnwo", "i", `/./`, ``, "abcdefghijklmnopqrstuvwxyz")
+}
 
-func TestSurname(t *testing.T)   { 
+func TestSurname(t *testing.T) {
 	in := `John Smith	100	2016/10/23
 Gupta Brown 954 2016/09/27
 Gorge Xavier 10 2015/04/20
 Jessica Smith 1 2012/02/14
-`	
+`
 	ex := `Gupta Brown 954 2016/09/27
 John Smith	100	2016/10/23
 Jessica Smith 1 2012/02/14
@@ -66,12 +67,12 @@ Gorge Xavier 10 2015/04/20
 	run(t, in, "i", `/.*/,/\n/`, ` [A-Z]+`, ex)
 }
 
-func TestYear(t *testing.T)   { 
+func TestYear(t *testing.T) {
 	in := `John Smith	100	2016/10/23
 Gupta Brown 954 2016/09/27
 Gorge Xavier 10 2015/04/20
 Jessica Smith 1 2012/02/14
-`	
+`
 	ex := `Jessica Smith 1 2012/02/14
 Gorge Xavier 10 2015/04/20
 John Smith	100	2016/10/23
@@ -79,7 +80,6 @@ Gupta Brown 954 2016/09/27
 `
 	run(t, in, "i", `/.*/,/\n/`, `..../`, ex)
 }
-
 
 var DPAT = `func D() {
 	fmt.Println("Isn't")
