@@ -1,19 +1,19 @@
 package main
 
 import (
-//	"encoding/binary"
-//	"encoding/base64"
-//	"encoding/base32"
+	//	"encoding/binary"
+	//	"encoding/base64"
+	//	"encoding/base32"
 	"encoding/hex"
-//	"encoding/pem"
-//	"encoding/csv"
-	"bytes"
-	"unicode"
-	"io"
+	//	"encoding/pem"
+	//	"encoding/csv"
 	"bufio"
-	"os"
-	"fmt"
+	"bytes"
 	"flag"
+	"fmt"
+	"io"
+	"os"
+	"unicode"
 )
 
 import (
@@ -21,17 +21,18 @@ import (
 )
 
 const (
-	Prefix     = "xc: "
-	NBuffer = 1024*1024
+	Prefix  = "xc: "
+	NBuffer = 1024 * 1024
 )
+
 var f *flag.FlagSet
 var args struct {
-	h, q  bool
-	r     bool
-	k string
+	h, q bool
+	r    bool
+	k    string
 }
 var (
-	in io.Reader = os.Stdin
+	in  io.Reader = os.Stdin
 	out io.Writer = os.Stdout
 )
 
@@ -55,7 +56,7 @@ func init() {
 func delete(src []byte) []byte {
 	m := func(r rune) rune {
 		if unicode.IsSpace(r) {
-			return(rune(-1))
+			return (rune(-1))
 		}
 		return r
 	}
@@ -65,8 +66,8 @@ func delete(src []byte) []byte {
 type Filter func([]byte) []byte
 
 type FilterReader struct {
-	r   io.Reader
-	fn  Filter
+	r  io.Reader
+	fn Filter
 }
 
 func NewFilterReader(r io.Reader, fn Filter) *FilterReader {
@@ -75,13 +76,11 @@ func NewFilterReader(r io.Reader, fn Filter) *FilterReader {
 
 func (f *FilterReader) Read(p []byte) (n int, err error) {
 	n, err = f.r.Read(p)
-	if n > 0{
+	if n > 0 {
 		n = copy(p, f.fn(p[:n]))
 	}
 	return n, err
 }
-
-
 
 // Modreader wraps an io.Reader to guarantee aligned reads
 // per each read call.
@@ -116,10 +115,10 @@ func NewModReader(r io.Reader, m int) *ModReader {
 func (m ModReader) Read(p []byte) (n int, err error) {
 	n, err = m.mux.Read(p)
 	if err != nil {
-		return 
+		return
 	}
 	d := n % m.mod
-	if d != 0{
+	if d != 0 {
 		// Copy the remainder to buf for the next Read
 		n -= d
 		m.buf.Write(p[n:])
@@ -134,20 +133,20 @@ func main() {
 	}
 	hexencode()
 }
-var(
-	n  int
-	err   error
-	nospace = bytes.TrimSpace
-	B  = make([]byte, 1024*1024)
-)
 
+var (
+	n       int
+	err     error
+	nospace = bytes.TrimSpace
+	B       = make([]byte, 1024*1024)
+)
 
 func hexencode() {
 	B2 := make([]byte, len(B)*2)
 	in := bufio.NewReader(in)
 	for err == nil {
-		n, err = in.Read(B);
-		if  err != nil && n < 1 {
+		n, err = in.Read(B)
+		if err != nil && n < 1 {
 			break
 		}
 		n = hex.Encode(B2, B[:n])
@@ -162,16 +161,19 @@ func hexdecode() {
 	in = NewModReader(NewFilterReader(in, delete), 2)
 	for err == nil {
 		n, err = in.Read(B)
-		if err != nil {break}
+		if err != nil {
+			break
+		}
 		n, err = hex.Decode(B[:n], B[:n])
-		if err != nil {break}
+		if err != nil {
+			break
+		}
 		n, err = out.Write(B[:n])
 	}
 	if err != nil && err != io.EOF {
 		printerr(err)
 	}
 }
-
 
 func usage() {
 	fmt.Println(`
