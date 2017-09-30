@@ -21,25 +21,23 @@ import (
 
 const Prefix = "walk: "
 
-
 // sem is for dirreads, gosem is for
 // goroutines. optimal number undetermined.
 
 var (
-	NGo   = 1024*16
+	NGo   = 1024 * 16
 	gosem = make(chan struct{}, NGo)
 )
 
 var args struct {
-	h, q bool
+	h, q             bool
 	a, b, c, d, f, m bool
-	t int64
+	t                int64
 }
 var f *flag.FlagSet
 
-
 var run struct {
-	walk func(string, func(string))
+	walk  func(string, func(string))
 	cond  []func(string) bool
 	print func(string)
 }
@@ -63,21 +61,22 @@ func init() {
 }
 
 type Dir struct {
-	Name string
+	Name  string
 	Files []os.FileInfo
 	Level int64
 }
 
 var (
-	visit map[string]bool
-	rwlock sync.RWMutex
+	visit       map[string]bool
+	rwlock      sync.RWMutex
 	visitedfunc = visited
 )
 
 func isdir(f string) bool {
 	fi, err := os.Stat(f)
 	if err != nil {
-		printerr(err); return false
+		printerr(err)
+		return false
 	}
 	return fi.IsDir()
 }
@@ -89,7 +88,7 @@ func notdir(f string) bool {
 func init() {
 	visit = make(map[string]bool)
 	if !args.m {
-		visitedfunc = func(f string) (bool) { return false }
+		visitedfunc = func(f string) bool { return false }
 	}
 }
 
@@ -102,18 +101,21 @@ func visited(f string) (yes bool) {
 	return
 }
 
-func print(f string)  {
+func print(f string) {
 	for _, fn := range run.cond {
-		if !fn(f) {return}
+		if !fn(f) {
+			return
+		}
 	}
 	fmt.Println(f)
 }
 
-func absprint(f string) bool{
+func absprint(f string) bool {
 	var err error
-	if !filepath.IsAbs(f){
+	if !filepath.IsAbs(f) {
 		if f, err = filepath.Abs(f); err != nil {
-			printerr(err); return false
+			printerr(err)
+			return false
 		}
 	}
 	print(f)
@@ -122,7 +124,8 @@ func absprint(f string) bool{
 
 func main() {
 	if args.h || args.q {
-		usage(); os.Exit(0)
+		usage()
+		os.Exit(0)
 	}
 	if args.d && args.f {
 		printerr("bad args: -d and -f")
@@ -130,9 +133,15 @@ func main() {
 	}
 
 	run.walk = dft
-	if args.d { run.cond = append(run.cond, isdir)}
-	if args.f { run.cond = append(run.cond, notdir)}
-	if args.b { run.walk = bft }
+	if args.d {
+		run.cond = append(run.cond, isdir)
+	}
+	if args.f {
+		run.cond = append(run.cond, notdir)
+	}
+	if args.b {
+		run.walk = bft
+	}
 
 	paths := f.Args()
 	if len(paths) == 0 {
@@ -157,7 +166,8 @@ func main() {
 				}
 			}
 			if f, err = filepath.Abs(f); err != nil {
-				printerr(err); return
+				printerr(err)
+				return
 			}
 			fmt.Println(f)
 		}
@@ -221,16 +231,16 @@ func bft(name string, fn func(string)) {
 	list := make(chan *Dir, NGo)
 	var wg sync.WaitGroup
 	fnx := make(chan *Dir, NGo+1)
-	
-	go func(){
+
+	go func() {
 		var wg2 sync.WaitGroup
-		for d := range fnx{
+		for d := range fnx {
 			wg2.Add(len(d.Files))
 			for _, f := range d.Files {
-				go func(d *Dir, f os.FileInfo){
+				go func(d *Dir, f os.FileInfo) {
 					kid := filepath.Join(d.Name, f.Name())
 					run.print(kid)
-					if f.IsDir(){
+					if f.IsDir() {
 						list <- dirs(kid, d.Level+1)
 					}
 					wg2.Done()
@@ -242,9 +252,9 @@ func bft(name string, fn func(string)) {
 	}()
 	wg.Add(1)
 	fnx <- dirs(name, 1)
-	go func(){
+	go func() {
 		for dir := range list {
-			if dir == nil{
+			if dir == nil {
 				continue
 			}
 			if dir.Level > args.t {
@@ -257,7 +267,6 @@ func bft(name string, fn func(string)) {
 	wg.Wait()
 	close(list)
 }
-
 
 func dirs(n string, level int64) (dir *Dir) {
 	f, err := ioutil.ReadDir(n)
