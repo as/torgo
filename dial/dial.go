@@ -6,21 +6,21 @@
 package main
 
 import (
-	"fmt"
+	"bufio"
 	"flag"
+	"fmt"
 	"io"
 	"net"
 	"os"
 	"os/exec"
-	"bufio"
 )
 import (
 	"github.com/as/mute"
 )
 
 const (
-	Prefix     = "dial: "
-	Debug      = false
+	Prefix = "dial: "
+	Debug  = false
 )
 
 var args struct {
@@ -28,9 +28,8 @@ var args struct {
 	k       bool
 	m       bool
 	a       int
-	n	string
+	n       string
 }
-
 
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
@@ -39,8 +38,8 @@ func init() {
 	f.BoolVar(&args.v, "v", false, "")
 	f.BoolVar(&args.k, "k", false, "")
 	f.BoolVar(&args.m, "m", false, "")
-	f.IntVar(&args.a,  "a", 4096, "")
-	f.StringVar(&args.n,  "n", "tcp4", "")
+	f.IntVar(&args.a, "a", 4096, "")
+	f.StringVar(&args.n, "n", "tcp4", "")
 
 	err := mute.Parse(f, os.Args[1:])
 	if err != nil {
@@ -53,9 +52,8 @@ var (
 	socket string
 	proto  string
 	cmd    []string
-	done chan error
+	done   chan error
 )
-
 
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
@@ -64,8 +62,8 @@ func init() {
 	f.BoolVar(&args.v, "v", false, "")
 	f.BoolVar(&args.k, "k", false, "")
 	f.BoolVar(&args.m, "m", false, "")
-	f.IntVar(&args.a,  "a", 4096, "")
-	f.StringVar(&args.n,  "n", "tcp4", "")
+	f.IntVar(&args.a, "a", 4096, "")
+	f.StringVar(&args.n, "n", "tcp4", "")
 
 	err := mute.Parse(f, os.Args[1:])
 	if err != nil {
@@ -85,7 +83,7 @@ func main() {
 
 	srv := f.Args()[0]
 	cmd := f.Args()[1:]
-	
+
 	fd, err := net.Dial(args.n, srv)
 	sysfatal(err)
 
@@ -101,7 +99,8 @@ func stream(fd net.Conn, cmd ...string) {
 	func(cfd net.Conn) {
 		defer cfd.Close()
 		if err != nil {
-			printerr(err); return
+			printerr(err)
+			return
 		}
 		verb("dial:", cfd.RemoteAddr().String())
 		if len(cmd) == 0 {
@@ -128,24 +127,25 @@ func streammux(fd net.Conn, cmd ...string) {
 			mw := io.MultiWriter(pimpedwr...)
 			mrw := bufio.NewReadWriter(bufio.NewReader(mr), bufio.NewWriter(mw))
 			i = len(pimpedwr) - 1
-			pimped[p]=i
+			pimped[p] = i
 			pimper <- mrw
 		}
 	}()
 	for {
-		sem <- true 
+		sem <- true
 		go func(cfd net.Conn) {
 			var err error
-			defer func() { <- sem }()
+			defer func() { <-sem }()
 			defer cfd.Close()
 			pimper <- cfd
-			lol := <- pimper
+			lol := <-pimper
 			if err != nil {
-				printerr(err); return
+				printerr(err)
+				return
 			}
 			verb("accept:", cfd.RemoteAddr().String())
 			if len(cmd) == 0 {
-			verb("accept:", cfd.RemoteAddr().String())
+				verb("accept:", cfd.RemoteAddr().String())
 				err := term3(cfd)
 				printerr(err)
 			} else {
@@ -181,14 +181,14 @@ func term3(rw net.Conn) (err error) {
 		fin <- err
 	}()
 
-	func () {
+	func() {
 		verb("open: stdin|net")
 		defer verb("close: stdin|net")
 		if _, err := io.Copy(rw, os.Stdin); err != nil {
 			printerr("stdin|net", err)
 		}
 	}()
-	return <- fin
+	return <-fin
 }
 
 func run3(rw io.ReadWriter, cmd string, args ...string) (err error) {
@@ -209,7 +209,7 @@ func run3(rw io.ReadWriter, cmd string, args ...string) (err error) {
 	if err = c.Start(); err != nil {
 		return err
 	}
-	
+
 	go func() {
 		verb("open: net|cmd")
 		defer verb("close: net|cmd")
@@ -220,7 +220,7 @@ func run3(rw io.ReadWriter, cmd string, args ...string) (err error) {
 		fin <- err
 	}()
 
-	func () {
+	func() {
 		verb("open: cmd|net")
 		defer verb("close: cmd|net")
 		if _, err := io.Copy(rw, pr); err != nil {
@@ -228,7 +228,7 @@ func run3(rw io.ReadWriter, cmd string, args ...string) (err error) {
 		}
 	}()
 
-	if err := <- fin; err != nil {
+	if err := <-fin; err != nil {
 		printerr("net|cmd", err)
 	}
 	in.Close()
