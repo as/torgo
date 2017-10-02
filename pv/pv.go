@@ -16,7 +16,7 @@ func (u Unit) String() string {
 		G  = 1 << 30
 		M  = 1 << 20
 		K  = 1 << 10
-		B  = 1 << 1
+		B  = 1 
 		fm = "%.3f %s"
 	)
 	switch {
