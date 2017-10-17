@@ -3,6 +3,7 @@ package main
 import (
 	//	"github.com/as/clip"
 	//"golang.org/x/image/font"
+	"github.com/as/frame/font"
 	"bufio"
 	"fmt"
 	"image"
@@ -69,7 +70,7 @@ func process(img image.Image, path string) (image.Image, error) {
 }
 
 var bitmap = image.NewRGBA(image.Rect(0, winSize.Y-35, winSize.X, winSize.Y))
-var fr = frame.New(bitmap.Bounds(), frame.NewGoMono(15), bitmap, frame.Acme)
+var fr = frame.New(bitmap.Bounds(), font.NewGoMono(15), bitmap, frame.Acme)
 
 func main() {
 	driver.Main(func(src screen.Screen) {
