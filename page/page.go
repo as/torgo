@@ -3,9 +3,9 @@ package main
 import (
 	//	"github.com/as/clip"
 	//"golang.org/x/image/font"
-	"github.com/as/frame/font"
 	"bufio"
 	"fmt"
+	"github.com/as/frame/font"
 	"image"
 	"image/color"
 	"image/draw"
