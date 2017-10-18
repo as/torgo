@@ -42,11 +42,17 @@ func init() {
 	log.SetFlags(0)
 	log.SetPrefix("z: ")
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
+	f.BoolVar(&args.h, "h", false, "")
+	f.BoolVar(&args.q, "?", false, "")
 	f.BoolVar(&args.d, "d", false, "")
 	err := mute.Parse(f, os.Args[1:])
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
+	}
+	if args.h || args.q {
+		usage()
+		os.Exit(0)
 	}
 }
 func ck(err error) {
