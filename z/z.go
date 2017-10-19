@@ -1,11 +1,11 @@
 package main
 
 import (
-	"compress/zlib"
-	"compress/lzw"
-	"compress/gzip"
 	"compress/bzip2"
 	"compress/flate"
+	"compress/gzip"
+	"compress/lzw"
+	"compress/zlib"
 	"flag"
 	"fmt"
 	"io"
@@ -16,20 +16,19 @@ import (
 	"github.com/as/mute"
 )
 
-type rw struct{
+type rw struct {
 	NewReader func(r io.Reader) io.ReadCloser
 	NewWriter func(w io.Writer) io.Writer
 }
 
-
 func main() {
 	var (
-		in io.Reader
+		in  io.Reader
 		out io.Writer
 	)
 	alg := "zlib"
-	if len(f.Args()) > 0{
-		alg=f.Args()[0]
+	if len(f.Args()) > 0 {
+		alg = f.Args()[0]
 	}
 	if args.d {
 		in, out = decompress(alg)
@@ -41,52 +40,52 @@ func main() {
 	flush(in, out)
 }
 
-func flush(fd ...interface{}){
-	for _,fd := range fd{
-		if fd, ok := fd.(io.Closer); ok{
+func flush(fd ...interface{}) {
+	for _, fd := range fd {
+		if fd, ok := fd.(io.Closer); ok {
 			fd.Close()
 		}
 	}
 }
 
-func compress(alg string) (in io.Reader, out io.Writer){
+func compress(alg string) (in io.Reader, out io.Writer) {
 	var err error
 	in, out = os.Stdin, os.Stdout
-	switch alg{
+	switch alg {
 	case "bzip2":
-		err=fmt.Errorf("bzip2: writer not implemented\n")
+		err = fmt.Errorf("bzip2: writer not implemented\n")
 	case "gzip":
-		out,err =  gzip.NewWriterLevel(out, args.l)
+		out, err = gzip.NewWriterLevel(out, args.l)
 	case "zlib":
-		out ,err= zlib.NewWriterLevel(out, args.l)
-	case "flate": 
+		out, err = zlib.NewWriterLevel(out, args.l)
+	case "flate":
 		out, err = flate.NewWriter(out, args.l)
 		ck(err)
 	case "lzw":
-		out= lzw.NewWriter(out,lzw.LSB,8)
+		out = lzw.NewWriter(out, lzw.LSB, 8)
 	default:
-		err=fmt.Errorf("bad algorithm: %q\n", alg)
+		err = fmt.Errorf("bad algorithm: %q\n", alg)
 	}
 	ck(err)
 	return in, out
 }
 
-func decompress(alg string) (in io.Reader, out io.Writer){
+func decompress(alg string) (in io.Reader, out io.Writer) {
 	var err error
 	in, out = os.Stdin, os.Stdout
-	switch alg{
+	switch alg {
 	case "bzip2":
-		in =  bzip2.NewReader(in)
+		in = bzip2.NewReader(in)
 	case "gzip":
-		in, err =  gzip.NewReader(in)
+		in, err = gzip.NewReader(in)
 	case "zlib":
-		in,err =  zlib.NewReader(in)
-	case "flate": 
-		in= flate.NewReader(in)
+		in, err = zlib.NewReader(in)
+	case "flate":
+		in = flate.NewReader(in)
 	case "lzw":
-		in= lzw.NewReader(in,lzw.LSB,8)
+		in = lzw.NewReader(in, lzw.LSB, 8)
 	default:
-		err=fmt.Errorf("bad algorithm: %q\n", alg)
+		err = fmt.Errorf("bad algorithm: %q\n", alg)
 	}
 	ck(err)
 	return in, out
@@ -95,26 +94,26 @@ func decompress(alg string) (in io.Reader, out io.Writer){
 var args struct {
 	h, q bool
 	d    bool
-	z bool
-	l int
+	z    bool
+	l    int
 }
 var f *flag.FlagSet
 
-func level(){
-	if len(os.Args) == 1{
+func level() {
+	if len(os.Args) == 1 {
 		return
 	}
-	for i, v := range os.Args[1:]{
-		if len(v) > 1{
-			v=v[1:]
+	for i, v := range os.Args[1:] {
+		if len(v) > 1 {
+			v = v[1:]
 		}
 		n, err := strconv.Atoi(v)
-		if err != nil{
+		if err != nil {
 			continue
 		}
-		if n>=0 && n<= 9{
-			args.l=n
-			os.Args[i+1]="-z"
+		if n >= 0 && n <= 9 {
+			args.l = n
+			os.Args[i+1] = "-z"
 		}
 	}
 }
