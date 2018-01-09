@@ -55,23 +55,6 @@ var (
 	done   chan error
 )
 
-func init() {
-	f = flag.NewFlagSet("main", flag.ContinueOnError)
-	f.BoolVar(&args.h, "h", false, "")
-	f.BoolVar(&args.q, "?", false, "")
-	f.BoolVar(&args.v, "v", false, "")
-	f.BoolVar(&args.k, "k", false, "")
-	f.BoolVar(&args.m, "m", false, "")
-	f.IntVar(&args.a, "a", 4096, "")
-	f.StringVar(&args.n, "n", "tcp4", "")
-
-	err := mute.Parse(f, os.Args[1:])
-	if err != nil {
-		printerr(err)
-		os.Exit(1)
-	}
-}
-
 var f *flag.FlagSet
 
 type InvalidReason int
