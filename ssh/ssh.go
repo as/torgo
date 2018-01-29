@@ -125,9 +125,7 @@ func main() {
 	}
 	if arg.p != "" {
 		config.Auth = append(config.Auth, ssh.PasswordCallback(Pass))
-	} else {
-		panic("no")
-	}
+	} 
 
 	addrsvc := addr.addr + ":" + addr.svc
 	conn, err := ssh.Dial(addr.net, addrsvc, config)
