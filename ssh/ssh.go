@@ -119,14 +119,14 @@ func main() {
 	}
 	config := &ssh.ClientConfig{
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		User: arg.u,
+		User:            arg.u,
 	}
 	if arg.d != "" {
 		config.Auth = append(config.Auth, ssh.PublicKeysCallback(Signers))
 	}
 	if arg.p != "" {
 		config.Auth = append(config.Auth, ssh.PasswordCallback(Pass))
-	} 
+	}
 
 	addrsvc := addr.addr + ":" + addr.svc
 	conn, err := ssh.Dial(addr.net, addrsvc, config)
