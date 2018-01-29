@@ -118,6 +118,7 @@ func main() {
 		os.Exit(1)
 	}
 	config := &ssh.ClientConfig{
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		User: arg.u,
 	}
 	if arg.d != "" {
