@@ -5,7 +5,13 @@ import (
 	"fmt"
 	"io"
 	"testing"
+
+	"github.com/as/xo"
 )
+
+func sregexp(in io.Reader, s string) (*xo.Xo, error) {
+	return xo.NewReaderString(in, "", s)
+}
 
 func driver(rie []string) (ac string, err error) {
 	re, in, ex := rie[0], rie[1], rie[2]
