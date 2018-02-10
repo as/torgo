@@ -25,9 +25,7 @@ import (
 )
 
 const (
-	Prefix    = "xo: "
-	MaxBuffer = 1024 * 1024 * 512
-	Debug     = false // true false
+	Prefix = "xo: "
 )
 
 var args struct {
@@ -43,7 +41,6 @@ var args struct {
 	f       string
 	x       string
 	y       string
-	s       string
 }
 
 var count struct {
@@ -183,8 +180,7 @@ func main() {
 		a = a[1:]
 	}
 
-	oneline := strings.Index(re, NL) == -1
-	if !oneline {
+	if !strings.Contains(re, NL) {
 		// replace newline with low-precedence OR
 		// AB\nC -> (BC)|(C)
 		re = fmt.Sprintf("(%s)", strings.Replace(re, NL, ")|(", -1))
@@ -209,20 +205,6 @@ var NL = func() string {
 	}
 	return "\n"
 }()
-
-func println(v ...interface{}) {
-	fmt.Print(Prefix)
-	fmt.Println(v...)
-}
-func printerr(v ...interface{}) {
-	log.Println(v...)
-}
-
-func debugerr(v ...interface{}) {
-	if Debug {
-		log.Println(v...)
-	}
-}
 
 func usage() {
 	fmt.Println(`
