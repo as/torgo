@@ -3,15 +3,15 @@ package main
 import (
 	"bufio"
 	"flag"
-	"golang.org/x/image/draw"
 	"image"
-	. "image/color"
 	"image/color/palette"
 	"image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"log"
 	"os"
+
+	"golang.org/x/image/draw"
 )
 
 const (
