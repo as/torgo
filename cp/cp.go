@@ -80,23 +80,29 @@ func cp(dir string) {
 	}
 	wg.Wait()
 }
+
 func docp(dst, src string) (n int64, err error) {
 	defer semrelease()
 	defer wg.Done()
 
-	var buf [2 << 15]byte
+	var buf [1<<16]byte
 	if args.v {
 		fmt.Println(dst)
 	}
-	fds, err := os.Open(src)
+	
+	src, err := os.Open(src)
 	fatal(err)
-	defer fds.Close()
+	defer src.Close()
+	
 	mkdir(dirof(dst))
-	fdd, err := os.Create(dst)
-	defer fdd.Close()
+	
+	dst, err := os.Create(dst)
 	fatal(err)
+	defer dst.Close()
+	
 	return io.CopyBuffer(fdd, fds, buf[:])
 }
+
 func clean(dir string) string {
 	dir = filepath.ToSlash(dir)
 	dir = filepath.FromSlash(dir)
