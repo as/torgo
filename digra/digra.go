@@ -23,8 +23,6 @@ import (
 
 const (
 	Prefix    = "digra: "
-	MaxBuffer = 1024 * 1024 * 512
-	Debug     = true
 )
 
 var f *flag.FlagSet
@@ -32,7 +30,6 @@ var args struct {
 	h, q bool
 	f    string
 }
-
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
 	f.BoolVar(&args.h, "h", false, "")
@@ -46,6 +43,7 @@ func main() {
 	)
 	go func() {
 		fd, err := os.Open(f.Args()[0])
+		fatal(err)
 		g, err = parse(fd)
 		fatal(err)
 	}()
@@ -62,12 +60,6 @@ func main() {
 
 type nodes []string
 
-var (
-	ctl  = os.Stdin
-	data = args.f
-	out  = os.Stdout
-	err  = os.Stderr
-)
 
 func (l nodes) println(sep string) {
 	for i, label := range l {
@@ -546,17 +538,6 @@ EXAMPLE
 BUGS
 	
 `)
-}
-
-func println(v ...interface{}) {
-	fmt.Print(Prefix)
-	fmt.Println(v...)
-}
-
-func debugerr(v ...interface{}) {
-	if Debug {
-		printerr(v)
-	}
 }
 
 func printerr(v ...interface{}) {
