@@ -2,6 +2,11 @@ package main
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/des"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
@@ -9,16 +14,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-)
-import (
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/des"
-	"crypto/rand"
-	//	"crypto/rc4"
-	"encoding/hex"
-)
-import (
+
 	"github.com/as/mute"
 	"github.com/as/pkcs7"
 )
@@ -36,7 +32,7 @@ var (
 		}
 		return "dec"
 	}()
-	NBuffers  = 0
+
 	Streaming = false
 	BlockSize = 16
 )
@@ -62,10 +58,6 @@ type algorithm struct {
 	Keylen
 }
 
-type blockstream struct {
-	cipher.Stream
-}
-
 type ECBEncrypter struct {
 	cipher.Block
 }
@@ -74,9 +66,6 @@ type ECBDecrypter struct {
 	cipher.Block
 }
 
-func Blockify(s cipher.Stream) *blockstream {
-	return &blockstream{s}
-}
 func (s *blockstream) BlockSize() int {
 	return BlockSize
 }
@@ -327,60 +316,8 @@ func decrypt(w io.Writer, r io.Reader, alg cipher.BlockMode) (int, error) {
 }
 
 //
-// Goroutines
-//
-
-type ModReader struct {
-	mod int
-	r   io.Reader
-	buf *bytes.Buffer
-}
-
-func newModReader(r io.Reader, m int) *ModReader {
-	return &ModReader{
-		m,
-		r,
-		new(bytes.Buffer),
-	}
-}
-func (m ModReader) Read(p []byte) (int, error) {
-	maxread := int64(len(p))
-	lr := io.LimitReader(m.r, maxread)
-	n, _ := m.buf.ReadFrom(lr)
-	if n == 0 {
-		return 0, io.EOF
-	}
-	align := m.buf.Len()
-	if int(n) > m.mod {
-		align -= align % m.mod
-	}
-	printerr("modreader: Read: m.mod", m.mod)
-	printerr("modreader: Read: (align)", align)
-	return io.ReadFull(m.buf, p[:align])
-
-}
-
-type MinReader struct {
-	min int
-	r   io.Reader
-}
-
-func newMinReader(r io.Reader, m int) *MinReader {
-	return &MinReader{m, r}
-
-}
-func (m MinReader) Read(p []byte) (n int, err error) {
-	return io.ReadAtLeast(m.r, p, m.min)
-}
-
-//
 // Helper
 //
-
-func println(v ...interface{}) {
-	fmt.Print(Prefix)
-	fmt.Println(v...)
-}
 
 func printerr(v ...interface{}) {
 	fmt.Fprint(os.Stderr, Prefix)
