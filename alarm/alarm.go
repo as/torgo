@@ -72,11 +72,6 @@ func duddyout(err error) {
 	os.Exit(1)
 }
 
-func println(v ...interface{}) {
-	fmt.Print(Prefix)
-	fmt.Println(v...)
-}
-
 func printerr(v ...interface{}) {
 	fmt.Fprint(os.Stderr, Prefix)
 	fmt.Fprintln(os.Stderr, v...)
