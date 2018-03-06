@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	Prefix = "dial: "
+	Prefix = "dial:"
 	Debug  = false
 )
 
@@ -47,13 +47,6 @@ func init() {
 		os.Exit(1)
 	}
 }
-
-var (
-	socket string
-	proto  string
-	cmd    []string
-	done   chan error
-)
 
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
@@ -236,88 +229,9 @@ func run3(rw io.ReadWriter, cmd string, args ...string) (err error) {
 	return c.Wait()
 }
 
-/*
- *	Below is UDP stuff. Experimental and not tested
- */
-
-func newudp(p *pkt) *udp {
-	rx := make(chan *pkt)
-	return &udp{
-		p.src,
-		nil,
-		p,
-		rx,
-		nil,
-	}
-}
-
-func (u udp) Read(b []byte) (n int, err error) {
-	printerr("udp.read")
-	if u.rx == nil {
-		return 0, nil
-	}
-
-	b2, ok := <-u.rx
-	if !ok {
-		return 0, fmt.Errorf("rx closed")
-	}
-	if int(b2.size) > len(b) {
-		err = fmt.Errorf("short read")
-	}
-	copy(b, b2.data)
-	printerr("e.read")
-	return len(b), err
-}
-
-func (u udp) Write(b []byte) (n int, err error) {
-	printerr("udp.write")
-	if u.tx == nil {
-		return 0, nil
-	}
-	u.tx <- &pkt{len(b), u.raddr, b}
-	printerr("e.write")
-	return len(b), nil
-}
-
-func (u udp) Close() error {
-	printerr("udp.close")
-	if u.tx != nil {
-		close(u.tx)
-	}
-	if u.rx != nil {
-		close(u.rx)
-	}
-	printerr("e.close")
-	return nil
-}
-
-type udp struct {
-	raddr, laddr *net.UDPAddr
-	first        *pkt
-	rx           chan *pkt
-	tx           chan *pkt
-}
-
-type pkt struct {
-	size int
-	src  *net.UDPAddr
-	data []byte
-}
-
-func println(v ...interface{}) {
-	fmt.Print(Prefix)
-	fmt.Println(v...)
-}
-
 func printerr(v ...interface{}) {
 	fmt.Fprint(os.Stderr, Prefix)
 	fmt.Fprintln(os.Stderr, v...)
-}
-
-func printdebug(v ...interface{}) {
-	if Debug {
-		printerr(v...)
-	}
 }
 
 func usage() {
