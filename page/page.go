@@ -70,7 +70,7 @@ func process(img image.Image, path string) (image.Image, error) {
 }
 
 var bitmap = image.NewRGBA(image.Rect(0, winSize.Y-35, winSize.X, winSize.Y))
-var fr = frame.New(bitmap, bitmap.Bounds(), &frame.Config{Font: font.NewGoMono(15), Color: frame.Acme})
+var fr = frame.New(bitmap, bitmap.Bounds(), &frame.Config{Face: font.NewGoMono(15), Color: frame.Acme})
 
 func main() {
 	driver.Main(func(src screen.Screen) {
