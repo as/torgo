@@ -36,11 +36,11 @@ const (
 
 const (
 	ReadOnly Bitflag = 0x01
-	Hidden           = 0x02
-	System           = 0x04
-	Modified         = 0x20
-	AutoRun          = 0x40
-	Unicode          = 0x80 // Ignored. UTF8 only.
+	Hidden   Bitflag = 0x02
+	System   Bitflag = 0x04
+	Modified Bitflag = 0x20
+	AutoRun  Bitflag = 0x40
+	Unicode  Bitflag = 0x80 // Ignored. UTF8 only.
 )
 
 type Bitflag uint16
