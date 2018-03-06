@@ -85,21 +85,21 @@ func docp(dst, src string) (n int64, err error) {
 	defer semrelease()
 	defer wg.Done()
 
-	var buf [1<<16]byte
+	var buf [1 << 16]byte
 	if args.v {
 		fmt.Println(dst)
 	}
-	
+
 	src, err := os.Open(src)
 	fatal(err)
 	defer src.Close()
-	
+
 	mkdir(dirof(dst))
-	
+
 	dst, err := os.Create(dst)
 	fatal(err)
 	defer dst.Close()
-	
+
 	return io.CopyBuffer(fdd, fds, buf[:])
 }
 
