@@ -26,7 +26,7 @@ func main() {
 	}
 	for {
 		out, err := exec.Command(a[0], a[1:]...).Output()
-		fmt.Print(out)
+		fmt.Print(string(out))
 		if err != nil {
 			e, _ := err.(*exec.ExitError)
 			if e != nil && !*checkStatus {
