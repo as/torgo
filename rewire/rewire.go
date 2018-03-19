@@ -57,10 +57,11 @@ func (c *Cmd) Redirect(r *exec.Cmd, fd uintptr) {
 		r.Stdin, _ = c.StdoutPipe()
 	case 2:
 	default:
-		if delta := fd - uintptr(len(c.ExtraFiles)); delta > 0 {
+		delta := fd - uintptr(len(c.ExtraFiles)) - 2
+		if delta > 0 {
 			c.ExtraFiles = append(c.ExtraFiles, make([]*os.File, delta)...)
 		}
-		c.ExtraFiles[fd] = file
+		c.ExtraFiles[fd-3] = file
 	}
 	if fd < 3 {
 		// We'll look at this before running the final command
