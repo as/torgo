@@ -12,13 +12,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
-)
 
-import (
 	"github.com/as/mute"
 )
 
@@ -43,6 +42,7 @@ var args struct {
 	d    bool
 	c    bool
 	l    bool
+	R    bool
 	x    string
 	y    string
 	s    string
@@ -62,6 +62,7 @@ func init() {
 	f.StringVar(&args.x, "x", ".+", "")
 	f.StringVar(&args.y, "y", "", "")
 	f.StringVar(&args.s, "s", "0:1", "")
+	f.BoolVar(&args.R, "R", false, "")
 
 	err := mute.Parse(f, os.Args[1:])
 	if args.x != "" && args.y != "" {
@@ -209,7 +210,31 @@ func main() {
 		i++
 		return seen[subf]
 	}
-
+	if args.R {
+		var buf [1e6]byte
+		dupmap := make(map[string]struct{})
+		for file := range in {
+			for {
+				n, err := file.Read(buf[:])
+				if n > 0 {
+					x := string(buf[:n])
+					_, dup := dupmap[x]
+					if !dup {
+						fmt.Print(x)
+					}
+					dupmap[x] = struct{}{}
+				}
+				if err != nil {
+					if err != io.EOF {
+						log.Println(err)
+					}
+					break
+				}
+			}
+			file.Close()
+		}
+		os.Exit(0)
+	}
 	for file := range in {
 		for sc := bufio.NewScanner(file); sc.Scan(); {
 			isdup(sc.Text())
@@ -300,6 +325,7 @@ NAME
 
 SYNOPSIS
 	uniq [-u -d -c] [file]
+	uniq [-R] [-u -d -c] [file]
 	uniq [-x regexp | -y regexp] [-u -d -c] [file]
 	uniq [-x regexp | -y regexp] [-s n¹:nⁿ] [-u -d -c] [file]
 
@@ -319,7 +345,10 @@ FLAGS
 	-d	Print only duplicates.
 	-l	Print only the last duplicate.
 	-u	Print only lines without duplicates
-
+	
+	-R Each call to read from stdin defines the tokens
+		to check for uniqueness. Overrides all flags below
+		
 	-x regexp   Extract substrings matching regexp and 
 				limit uniqueness tests to those strings.
 
