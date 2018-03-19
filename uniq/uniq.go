@@ -347,7 +347,8 @@ FLAGS
 	-u	Print only lines without duplicates
 	
 	-R Each call to read from stdin defines the tokens
-		to check for uniqueness. Overrides all flags below
+		to check for uniqueness. Overrides all flags 
+		and changes uniq to streaming mode.
 		
 	-x regexp   Extract substrings matching regexp and 
 				limit uniqueness tests to those strings.
