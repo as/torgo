@@ -25,7 +25,7 @@ func main() {
 		log.Println("usage: loop cmd [args...]")
 	}
 	for {
-		out, err := exec.Command(a[0], a[1:]...).Output()
+		out, err := exec.Command(a[0], a[1:]...).CombinedOutput()
 		fmt.Print(string(out))
 		if err != nil {
 			e, _ := err.(*exec.ExitError)
