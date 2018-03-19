@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	Prefix    = "digra: "
+	Prefix = "digra: "
 )
 
 var f *flag.FlagSet
@@ -30,6 +30,7 @@ var args struct {
 	h, q bool
 	f    string
 }
+
 func init() {
 	f = flag.NewFlagSet("main", flag.ContinueOnError)
 	f.BoolVar(&args.h, "h", false, "")
@@ -59,7 +60,6 @@ func main() {
 }
 
 type nodes []string
-
 
 func (l nodes) println(sep string) {
 	for i, label := range l {
