@@ -83,7 +83,7 @@ func multiflight() {
 				if err != nil {
 					return
 				}
-				err = ioutil.WriteFile(fd.Name, buf.Bytes(), fi.Mode().Perm())
+				err = ioutil.WriteFile(fd.Name, ed.Bytes(), fi.Mode().Perm())
 				if err != nil {
 					return
 				}
