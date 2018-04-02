@@ -80,14 +80,14 @@ func multiflight() {
 				fd.Close()
 				var fi os.FileInfo
 				fi, err = os.Stat(fd.Name)
-				if err != nil{
+				if err != nil {
 					return
 				}
 				err = ioutil.WriteFile(fd.Name, buf.Bytes(), fi.Mode().Perm())
-				if err != nil{
+				if err != nil {
 					return
 				}
-				
+
 				nmodified++
 				if *m {
 					fmt.Println(fd.Name)
@@ -102,12 +102,12 @@ func multiflight() {
 				}
 			}
 		}()
-				if err != nil{
-					log.Printf("%q: %s", fd.Name, err)
-				}
-				if err0 != nil{
-					err0 = err
-				}
+		if err != nil {
+			log.Printf("%q: %s", fd.Name, err)
+		}
+		if err0 != nil {
+			err0 = err
+		}
 	}
 }
 
@@ -134,7 +134,7 @@ func singleflight() {
 
 	io.Copy(out, bytes.NewReader(buf.Bytes()))
 	out.Flush()
-	if cmd.Modified(){
+	if cmd.Modified() {
 		nmodified++
 	}
 }
