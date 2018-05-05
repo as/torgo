@@ -31,6 +31,9 @@ func main() {
 		os.Exit(0)
 	}
 	resp, err := http.Get(f.Args()[0])
+	if args.v{
+		fmt.Print(Response{resp})
+	}
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -85,6 +88,16 @@ EXAMPLE
 	hget https://downover.io > downover.html
 
 `)
+}
+
+type Response struct{
+	*http.Response
+}
+func (r Response) String() string{
+	if r.Response == nil{
+		return "<nil>"
+	}
+	return fmt.Sprintf("%s Status: %s\n%s\n", r.Proto, r.Status, r.Header)
 }
 
 func println(v ...interface{}) {
