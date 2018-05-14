@@ -90,17 +90,19 @@ func docp(dst, src string) (n int64, err error) {
 		fmt.Println(dst)
 	}
 
-	src, err := os.Open(src)
-	fatal(err)
-	defer src.Close()
+	{
+		src, err := os.Open(src)
+		fatal(err)
+		defer src.Close()
 
-	mkdir(dirof(dst))
+		mkdir(dirof(dst))
 
-	dst, err := os.Create(dst)
-	fatal(err)
-	defer dst.Close()
+		dst, err := os.Create(dst)
+		fatal(err)
+		defer dst.Close()
+		return io.CopyBuffer(dst, src, buf[:])
+	}
 
-	return io.CopyBuffer(fdd, fds, buf[:])
 }
 
 func clean(dir string) string {
