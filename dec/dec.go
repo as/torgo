@@ -19,6 +19,9 @@ import (
 	"github.com/as/pkcs7"
 )
 
+func Blockify(s cipher.Stream) *blockstream {
+	return &blockstream{s}
+}
 const (
 	Prefix = "dec: "
 	Unset  = "‡"
@@ -71,6 +74,10 @@ func (s *blockstream) BlockSize() int {
 }
 func (s *blockstream) CryptBlocks(dst, src []byte) {
 	s.XORKeyStream(dst, src)
+}
+
+type blockstream struct {
+	cipher.Stream
 }
 
 func NewCBC(block cipher.Block, iv []byte) (cb cipher.BlockMode) {
@@ -484,7 +491,7 @@ EXAMPLE
 
 		echo -n we crash at dawn > m
 		kv=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
-		bvghhhhhh-r -e kv < m
+		enc -r -e kv < m
 
 	Encrypt m with aes/cbc/128. Key is set accordingly.
 
