@@ -18,7 +18,10 @@ import (
 	"github.com/as/mute"
 )
 
-func init() { log.SetPrefix("tar: ") }
+func init() {
+	log.SetPrefix("tar: ")
+	log.SetFlags(0)
+}
 
 var f *flag.FlagSet
 
@@ -108,7 +111,7 @@ func readtar(in io.Reader) {
 				break
 			}
 			if err != nil {
-				log.Printf("nexts:", err)
+				log.Printf("next:", err)
 				continue
 			}
 			if args.t {
@@ -119,9 +122,16 @@ func readtar(in io.Reader) {
 				fmt.Fprintln(os.Stderr, hdr.Name)
 			}
 			if fi := hdr.FileInfo(); fi.IsDir() {
+				// Does this ever get triggered?
 				os.MkdirAll(hdr.Name, fi.Mode())
 			} else {
 				log.Println(fi)
+				if dir := filepath.Dir(hdr.Name); !exists(dir) {
+					if dir == hdr.Name {
+						log.Printf("bug: mkdir creating file in tar as the directory instead")
+					}
+					os.MkdirAll(dir, fi.Mode())
+				}
 				fd, err := os.Create(hdr.Name)
 				if err != nil {
 					return err
@@ -138,6 +148,11 @@ func readtar(in io.Reader) {
 	if err != nil {
 		log.Printf("error: %s", err)
 	}
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
 }
 
 func main() {
