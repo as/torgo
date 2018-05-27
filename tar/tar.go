@@ -115,7 +115,7 @@ func readtar(in io.Reader) {
 				continue
 			}
 			if args.t {
-				fmt.Println("x", filepath.FromSlash(hdr.Name))
+				fmt.Println(filepath.FromSlash(hdr.Name))
 				continue
 			}
 			if args.v {
@@ -125,7 +125,6 @@ func readtar(in io.Reader) {
 				// Does this ever get triggered?
 				os.MkdirAll(hdr.Name, fi.Mode())
 			} else {
-				log.Println(fi)
 				if dir := filepath.Dir(hdr.Name); !exists(dir) {
 					if dir == hdr.Name {
 						log.Printf("bug: mkdir creating file in tar as the directory instead")
