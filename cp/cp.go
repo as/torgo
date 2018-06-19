@@ -92,13 +92,19 @@ func docp(dst, src string) (n int64, err error) {
 
 	{
 		src, err := os.Open(src)
-		fatal(err)
+		if err != nil{
+			printerr(err)
+			return 0, err
+		}
 		defer src.Close()
 
 		mkdir(dirof(dst))
 
 		dst, err := os.Create(dst)
-		fatal(err)
+		if err != nil{
+			printerr(err)
+			return 0, err
+		}
 		defer dst.Close()
 		return io.CopyBuffer(dst, src, buf[:])
 	}
@@ -119,10 +125,10 @@ func mkdir(dir string) error {
 }
 func readable(file string) bool {
 	fd, err := os.Open(clean(file))
-	defer fd.Close()
 	if err != nil {
 		printerr(err) //TODO
 	}
+	defer fd.Close()
 	return true
 }
 func println(v ...interface{}) {
