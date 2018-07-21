@@ -34,7 +34,7 @@ func main() {
 
 	dst := new(bytes.Buffer)
 
-	if err = json.Indent(dst, src, "\t", ""); err != nil {
+	if err = json.Indent(dst, src, "", "\t"); err != nil {
 		fmt.Print(string(src))
 		os.Exit(1)
 	}
