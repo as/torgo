@@ -37,7 +37,7 @@ var (
 	a      = flag.Bool("a", false, "Print absolute paths")
 	r      = flag.Bool("r", false, "Raw list output")
 	V      = flag.Bool("V", false, "No vendor")
-	T      = flag.Bool("T", false, "No tests")
+	T     = flag.Bool("T", false, "No tests")
 	VT     = flag.Bool("VT", false, "No tests or vendor")
 )
 
@@ -54,22 +54,22 @@ func init() {
 		os.Exit(0)
 	}
 	argv = strings.Join(flag.Args(), " ")
-
-	if *VT {
-		*V = true
-		*T = true
+	
+	if *VT{
+		*V=true
+		*T=true
 	}
 	if *V || *T {
-		*f = true
-		*v = true
-		*nocase = true
+		*f=true
+		*v=true
+		*nocase=true
 	}
-
-	if *V && *T {
+	
+	if *V && *T{
 		argv = "(vendor/|_test.go)"
-	} else if *V {
+	} else if *V{
 		argv = "(vendor/)"
-	} else {
+	} else if *T{
 		argv = "(_test.go/)"
 	}
 }
@@ -98,7 +98,7 @@ func main() {
 	switch {
 	case *u, *uu:
 		untracked(fn, *uu)
-		if !*d && !*dd {
+		if !*d && !*dd{
 			break
 		}
 		fallthrough
@@ -216,7 +216,7 @@ func readindex(gitdir string) (*Dir, error) {
 	return dir, dir.ReadBinary(fd)
 }
 func untracked(println func(string), all bool) {
-	git, attach, _, _ := grubber()
+	git, attach,_,_ := grubber()
 
 	gitroot := "."
 	prefix, err := filepath.Rel(attach, wd)
@@ -304,10 +304,7 @@ func xoxo() {
 
 // TODO(as): this is mostly a copy of xoxo()
 func chunk1() {
-	resrc := strings.Join(flag.Args(), " ")
-	if *f {
-		resrc = fmt.Sprintf(`diff..+git.+%s`, resrc)
-	}
+	resrc := argv
 	flags := "s"
 	if *nocase {
 		flags += "i"
