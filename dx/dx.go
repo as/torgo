@@ -27,7 +27,7 @@ var (
 
 	nocase = flag.Bool("i", false, "Use case-insensitive matching")
 	f      = flag.Bool("f", false, "Apply regexp only to the diff path")
-	chunk  = flag.Bool("c", false, "Apply regexp to each chunk in the diff")
+	chunk      = flag.Bool("c", false, "Apply regexp to each chunk in the diff")
 	v      = flag.Bool("v", false, "Reverse. Print items not matching regexp")
 	u      = flag.Bool("u", false, "List untracked files under the working directory")
 	uu     = flag.Bool("uu", false, "List untracked files in the repository")
@@ -102,7 +102,7 @@ func main() {
 		untracked(mkprinter(), *uu)
 		os.Exit(0)
 	}
-	if *chunk {
+	if *chunk{
 		chunk1()
 	} else {
 		xoxo()
@@ -230,32 +230,33 @@ func chunk1() {
 			nn := 0
 			if l1 != -1 {
 				label := string(b[:l1])
-				for {
-					c0 := bytes.Index(b, []byte("\n@@"))
-					if c0 == -1 {
-						break
-					}
-					h1 := bytes.Index(b[c0:], []byte("@@ "))
-					if h1 == -1 {
-						break
-					}
-					h1 += c0
-					c1 := bytes.Index(b[h1:], []byte("\n@@"))
-					if c1 == -1 {
-						c1 = len(b)
-					} else {
-						c1 += h1
-					}
+				b=b[l1:]
+				for{
+				c0 := bytes.Index(b, []byte("\n@@"))
+				if c0 == -1 {
+					break
+				}
+				h1 := bytes.Index(b[c0:], []byte("@@ "))
+				if h1 == -1 {
+					break
+				}
+				h1 += c0
+				c1 := bytes.Index(b[h1:], []byte("\n@@"))
+				if c1 == -1 {
+					c1 = len(b)
+				} else{
+					c1+=h1
+				}
 
-					if chunk := b[:c1]; re.Match(chunk) {
-						if nn == 0 {
-							fmt.Println(label)
-						}
-						nn++
-						fmt.Println(string(chunk))
+				if chunk := b[:c1]; re.Match(chunk) {
+					if nn == 0{
+						fmt.Print(label)
 					}
-
-					b = b[c1:]
+					nn++
+					fmt.Print(string(chunk))
+				}
+				
+				b = b[c1:]
 				}
 			}
 		}
@@ -285,7 +286,7 @@ NAME
 
 SYNOPSIS
 	git diff | dx [-f] [-v] [regexp]
-	dx -u
+	dx [-u | -uu]
 
 DESCRIPTION
 	Dx processes git metadata without the git program. The default
