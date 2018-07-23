@@ -262,7 +262,6 @@ func untracked(println func(string), all bool) {
 
 func xoxo() {
 	resrc := argv
-	println(resrc)
 	if *f {
 		resrc = fmt.Sprintf(`diff..+git.+%s`, resrc)
 	}
@@ -306,7 +305,6 @@ func xoxo() {
 // TODO(as): this is mostly a copy of xoxo()
 func chunk1() {
 	resrc := argv
-	println(resrc)
 	flags := "s"
 	if *nocase {
 		flags += "i"
