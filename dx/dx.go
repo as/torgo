@@ -36,9 +36,14 @@ var (
 	uu     = flag.Bool("uu", false, "List untracked files in working dir (-uu, entire repo)")
 	a      = flag.Bool("a", false, "Print absolute paths")
 	r      = flag.Bool("r", false, "Raw list output")
+	V      = flag.Bool("V", false, "No vendor")
+	T      = flag.Bool("T", false, "No tests")
+	VT     = flag.Bool("VT", false, "No tests or vendor")
 )
 
 var wd, wderr = os.Getwd()
+
+var argv string
 
 func init() {
 	log.SetPrefix(prefix)
@@ -47,6 +52,25 @@ func init() {
 	if *h1 || *h2 {
 		usage()
 		os.Exit(0)
+	}
+	argv = strings.Join(flag.Args(), " ")
+
+	if *VT {
+		*V = true
+		*T = true
+	}
+	if *V || *T {
+		*f = true
+		*v = true
+		*nocase = true
+	}
+
+	if *V && *T {
+		argv = "(vendor/|_test.go)"
+	} else if *V {
+		argv = "(vendor/)"
+	} else {
+		argv = "(_test.go/)"
 	}
 }
 
@@ -74,7 +98,7 @@ func main() {
 	switch {
 	case *u, *uu:
 		untracked(fn, *uu)
-		if !*d && !*dd{
+		if !*d && !*dd {
 			break
 		}
 		fallthrough
@@ -192,7 +216,7 @@ func readindex(gitdir string) (*Dir, error) {
 	return dir, dir.ReadBinary(fd)
 }
 func untracked(println func(string), all bool) {
-	git, attach,_,_ := grubber()
+	git, attach, _, _ := grubber()
 
 	gitroot := "."
 	prefix, err := filepath.Rel(attach, wd)
@@ -237,7 +261,7 @@ func untracked(println func(string), all bool) {
 }
 
 func xoxo() {
-	resrc := strings.Join(flag.Args(), " ")
+	resrc := argv
 	if *f {
 		resrc = fmt.Sprintf(`diff..+git.+%s`, resrc)
 	}
@@ -394,6 +418,10 @@ DESCRIPTION
 	-d,	List dirty (modified) files under the working directory (-dd, entire repo)
 	-u,	List untracked files under the working directory (-uu, entire repo)
 	-r,	Raw list output (for -u)
+	
+	Common shorthands
+	-V,	Exclude vendor directories, short for -f -v "vendor/"
+	-T,	Exclude go test files, short for -f -v "_test\.go"
 	
 EXAMPLE
 	See what changed in your repository without the million changelog files
@@ -627,13 +655,12 @@ func (c *Cstr) ReadBinary(r io.Reader) (err error) {
 	return err
 }
 
-type Varint = V
-type V uint64
+type Varint uint64
 
 var ErrOverflow = errors.New("varint: varint overflows a 64-bit integer")
 
 // WriteBinary writes the varint to the underlying writer.
-func (v V) WriteBinary(w io.Writer) (err error) {
+func (v Varint) WriteBinary(w io.Writer) (err error) {
 	for err == nil {
 		u := byte(v % 128)
 		v /= 128
@@ -653,7 +680,7 @@ func (v V) WriteBinary(w io.Writer) (err error) {
 
 // ReadBinary read a varint from the underlying reader. It does not
 // read beyond the varint.
-func (v *V) ReadBinary(r io.Reader) error {
+func (v *Varint) ReadBinary(r io.Reader) error {
 	var b [1]byte
 	m := int64(1)
 	for n := 0; n < MaxVLen64; n++ {
@@ -661,7 +688,7 @@ func (v *V) ReadBinary(r io.Reader) error {
 		if err != nil && err != io.EOF {
 			return err
 		}
-		*v += V((int64(b[0]&127) * m))
+		*v += Varint((int64(b[0]&127) * m))
 		m *= 128
 		if b[0]&128 == 0 {
 			return nil
