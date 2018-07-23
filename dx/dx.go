@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -27,17 +28,66 @@ var (
 
 	nocase = flag.Bool("i", false, "Use case-insensitive matching")
 	f      = flag.Bool("f", false, "Apply regexp only to the diff path")
-	chunk      = flag.Bool("c", false, "Apply regexp to each chunk in the diff")
+	chunk  = flag.Bool("c", false, "Apply regexp to each chunk in the diff")
 	v      = flag.Bool("v", false, "Reverse. Print items not matching regexp")
-	u      = flag.Bool("u", false, "List untracked files under the working directory")
-	uu     = flag.Bool("uu", false, "List untracked files in the repository")
+	d      = flag.Bool("d", false, "List untracked files in working dir (-dd, entire repo)")
+	dd     = flag.Bool("dd", false, "List untracked files in working dir (-dd, entire repo)")
+	u      = flag.Bool("u", false, "List untracked files in working dir (-uu, entire repo)")
+	uu     = flag.Bool("uu", false, "List untracked files in working dir (-uu, entire repo)")
 	a      = flag.Bool("a", false, "Print absolute paths")
 	r      = flag.Bool("r", false, "Raw list output")
 )
 
 var wd, wderr = os.Getwd()
 
-func grubber() (gitdir, attach string) {
+func init() {
+	log.SetPrefix(prefix)
+	log.SetFlags(0)
+	flag.Parse()
+	if *h1 || *h2 {
+		usage()
+		os.Exit(0)
+	}
+}
+
+func mkprinter() func(string) {
+	f := func(s string) {
+		fmt.Println(s)
+	}
+	if !*r {
+		g := f
+		f = func(s string) {
+			g("git add " + s)
+		}
+	}
+	if *a {
+		g := f
+		f = func(s string) {
+			g(filepath.Join(wd, s))
+		}
+	}
+	return f
+}
+
+func main() {
+	fn := mkprinter()
+	switch {
+	case *u, *uu:
+		untracked(fn, *uu)
+		if !*d && !*dd{
+			break
+		}
+		fallthrough
+	case *d, *dd:
+		dirty(fn, *dd)
+	case *chunk:
+		chunk1()
+	default:
+		xoxo()
+	}
+}
+
+func grubber() (gitdir, attach, prefix, gitroot string) {
 	file := ".git"
 	ceil := 256
 	up := "."
@@ -61,56 +111,88 @@ func grubber() (gitdir, attach string) {
 		}
 		attach, err := filepath.Abs(filepath.Join(file, ".."))
 		ck("grubber: attach", err)
-		return file, attach
+
+		prefix, err := filepath.Rel(attach, wd)
+		ck("rel", err)
+		if prefix == "." {
+			prefix = ""
+		}
+
+		gitroot, err := filepath.Rel(wd, attach)
+		ck("rel", err)
+		return file, attach, prefix, gitroot
 	}
 
 	log.Fatalf("grubber: dir tree missing git repo: leaf: %s", wd)
-	return "", ""
+	return
 }
+
+type item struct {
+	reply chan *item
+	name  string
+	hash  []byte
+	err   error
+}
+
+var hashin = make(chan item, 3)
 
 func init() {
-	log.SetPrefix(prefix)
-	log.SetFlags(0)
-	flag.Parse()
-	if *h1 || *h2 {
-		usage()
-		os.Exit(0)
+	for i := 0; i < 3; i++ {
+		go func() {
+			hx := sha1.New()
+			var data []byte
+			for {
+				select {
+				case w := <-hashin:
+					if data, w.err = ioutil.ReadFile(w.name); w.err == nil {
+						hx.Write([]byte(fmt.Sprintf("blob %d\x00", len(data))))
+						hx.Write(data)
+						w.hash = hx.Sum(nil)
+						hx.Reset()
+					}
+					w.reply <- &w
+				}
+			}
+		}()
 	}
 }
 
-func mkprinter() func(string) {
-	f := func(s string) {
-		fmt.Println(s)
-	}
-	if *a {
-		g := f
-		f = func(s string) {
-			g(filepath.Join(wd, s))
+func dirty(println func(string), all bool) {
+	git, _, prefix, gitroot := grubber()
+	dir, err := readindex(git)
+	ck("read index", err)
+
+	reply := make(chan *item, 1)
+	for _, v := range dir.Ent {
+		name := string(v.Path)
+		if !all && !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		name = filepath.Join(gitroot, name)
+		hashin <- item{
+			name:  name,
+			reply: reply,
+		}
+		r := <-reply
+		if r.err != nil {
+			log.Println("todo: hasher error or missing file", r.err)
+		}
+		if string(r.hash) != string(v.Hash[:]) {
+			name, _ = filepath.Rel(wd, filepath.Join(wd, name))
+			println(name)
 		}
 	}
-	if !*r {
-		g := f
-		f = func(s string) {
-			g("git add " + s)
-		}
-	}
-	return f
 }
 
-func main() {
-	if *u || *uu {
-		untracked(mkprinter(), *uu)
-		os.Exit(0)
-	}
-	if *chunk{
-		chunk1()
-	} else {
-		xoxo()
-	}
+func readindex(gitdir string) (*Dir, error) {
+	fd, err := os.Open(filepath.Join(gitdir, "index"))
+	ck("index", err)
+	defer fd.Close()
+	dir := &Dir{}
+	return dir, dir.ReadBinary(fd)
 }
-
 func untracked(println func(string), all bool) {
-	git, attach := grubber()
+	git, attach,_,_ := grubber()
 
 	gitroot := "."
 	prefix, err := filepath.Rel(attach, wd)
@@ -140,7 +222,6 @@ func untracked(println func(string), all bool) {
 			known[p] = strings.HasPrefix(p, prefix)
 		}
 	}
-
 	filepath.Walk(gitroot, filepath.WalkFunc(func(path string, info os.FileInfo, err error) error {
 		if filepath.Base(path) == ".git" {
 			return filepath.SkipDir
@@ -153,13 +234,12 @@ func untracked(println func(string), all bool) {
 		}
 		return nil
 	}))
-	//fmt.Println(dir)
 }
 
 func xoxo() {
 	resrc := strings.Join(flag.Args(), " ")
 	if *f {
-		resrc = fmt.Sprintf(`diff..+git.+%s`)
+		resrc = fmt.Sprintf(`diff..+git.+%s`, resrc)
 	}
 	flags := "s"
 	if *nocase {
@@ -202,7 +282,7 @@ func xoxo() {
 func chunk1() {
 	resrc := strings.Join(flag.Args(), " ")
 	if *f {
-		resrc = fmt.Sprintf(`diff..+git.+%s`)
+		resrc = fmt.Sprintf(`diff..+git.+%s`, resrc)
 	}
 	flags := "s"
 	if *nocase {
@@ -230,33 +310,33 @@ func chunk1() {
 			nn := 0
 			if l1 != -1 {
 				label := string(b[:l1])
-				b=b[l1:]
-				for{
-				c0 := bytes.Index(b, []byte("\n@@"))
-				if c0 == -1 {
-					break
-				}
-				h1 := bytes.Index(b[c0:], []byte("@@ "))
-				if h1 == -1 {
-					break
-				}
-				h1 += c0
-				c1 := bytes.Index(b[h1:], []byte("\n@@"))
-				if c1 == -1 {
-					c1 = len(b)
-				} else{
-					c1+=h1
-				}
-
-				if chunk := b[:c1]; re.Match(chunk) {
-					if nn == 0{
-						fmt.Print(label)
+				b = b[l1:]
+				for {
+					c0 := bytes.Index(b, []byte("\n@@"))
+					if c0 == -1 {
+						break
 					}
-					nn++
-					fmt.Print(string(chunk))
-				}
-				
-				b = b[c1:]
+					h1 := bytes.Index(b[c0:], []byte("@@ "))
+					if h1 == -1 {
+						break
+					}
+					h1 += c0
+					c1 := bytes.Index(b[h1:], []byte("\n@@"))
+					if c1 == -1 {
+						c1 = len(b)
+					} else {
+						c1 += h1
+					}
+
+					if chunk := b[:c1]; re.Match(chunk) {
+						if nn == 0 {
+							fmt.Print(label)
+						}
+						nn++
+						fmt.Print(string(chunk))
+					}
+
+					b = b[c1:]
 				}
 			}
 		}
@@ -308,25 +388,35 @@ DESCRIPTION
 	
 	-i,	Use case-insensitive matching
 	-v,	Reverse. Match items only if they dont match regexp
+	-f,	Apply regexp only to git diff path (for filtering/including files)
+	-c,	Apply regexp to each chunk in the diff (does not recompute sha1s)
 	
-	-f, Apply regexp only to git diff path (for filtering/including files)
-	-c, Apply regexp to each chunk in the diff (does not recompute sha1s)
-	
-	-u, List untracked files under the working directory
-	-uu, List untracked files in the repository
+	-d,	List dirty (modified) files under the working directory (-dd, entire repo)
+	-u,	List untracked files under the working directory (-uu, entire repo)
 	-r,	Raw list output (for -u)
 	
 EXAMPLE
-	
 	See what changed in your repository without the million changelog files
         git diff | dx -f -v changelog
+	Look for file changes containing the word "memoize"
+        git diff | dx -f -v changelog | dx memoize
+	Search chunks in those files that contain the word DRAGON, TODO, or HACK
+        git diff | dx -f -v changelog | dx memoize | dx -c "(DRAGON|TODO|HACK)"
 
 	List untracked files in the repository (pipeable output)
 		dx -uu
-	
-	As above, but only under the current working directory
+	List files in the repo that differ by content with respect to the git log
+		dx -dd
+	As above, but only under the current working directory (not the entire repository)
 		dx -u
+		dx -d
 		
+BUGS
+	When filtering on chunks with -c, dx does not currently recompute the
+	expected hash of the filtered diff. Piping to git apply may not work until
+	this is fixed. As a result, documentation on how to go about this is not
+	published.
+	
 `)
 }
 
