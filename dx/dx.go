@@ -199,7 +199,9 @@ func dirty(println func(string), all bool) {
 		}
 		r := <-reply
 		if r.err != nil {
-			log.Println("todo: hasher error or missing file", r.err)
+			continue
+		//	//  this seems to sufficiently screw up the output visually even though it on stderr
+		//			log.Println("todo: hasher error or missing file", r.err)
 		}
 		if string(r.hash) != string(v.Hash[:]) {
 			name, _ = filepath.Rel(wd, filepath.Join(wd, name))
