@@ -11,6 +11,7 @@ import (
 
 var (
 	checkStatus = flag.Bool("ck", false, "check exit status and terminate loop if non-zero")
+	mon = flag.Bool("mon", false, "opposite of ck--exit only when the command outputs a non zero exit status")
 )
 
 func init() {
@@ -29,6 +30,9 @@ func main() {
 		fmt.Print(string(out))
 		if err != nil {
 			e, _ := err.(*exec.ExitError)
+			if e == nil && *mon {
+				continue
+			}
 			if e != nil && !*checkStatus {
 				continue
 			}
