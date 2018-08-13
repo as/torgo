@@ -18,7 +18,7 @@ var (
 )
 
 func init() {
-	log.SetPrefix(Prefix)
+	log.SetPrefix(prefix)
 	flag.Parse()
 	if *h1 || *h2 {
 		usage()
