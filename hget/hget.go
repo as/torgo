@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -9,9 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path"
-)
 
-import (
 	"github.com/as/mute"
 )
 
@@ -21,33 +20,64 @@ var args struct {
 	h, q bool
 	v    bool
 	a    bool
+	u string
+	f bool
 }
 var f *flag.FlagSet
 
 func main() {
 	out := io.Writer(os.Stdout)
+	if args.u == ""{
+		args.u = "Mozilla/5.0"
+	}
 	if args.h || args.q {
 		usage()
 		os.Exit(0)
 	}
-	resp, err := http.Get(f.Args()[0])
-	if args.v{
-		fmt.Print(Response{resp})
+	if len(f.Args()) == 0{
+		os.Exit(1)
 	}
-	if err != nil {
-		log.Fatalln(err)
+	arg := f.Args()[0]
+	if arg == "-" {
+		sc := bufio.NewScanner(os.Stdin)
+		for sc.Scan() {
+			doget(out,sc.Text())
+		}
+	} else {
+		doget(out,arg)
 	}
-	defer resp.Body.Close()
+}
+
+func doget(out io.Writer, ur string) {
 	if args.a {
-		u, err := url.Parse(f.Args()[0])
+		u, err := url.Parse(ur)
 		_, file := path.Split(u.Path)
+		if args.f {
+			_, err := os.Stat(file)
+			if err != nil {
+				log.Println("skip file", file)
+			}
+			return
+		}
 		fd, err := os.Create(file)
 		no(err)
 		defer fd.Close()
 		out = fd
 	}
+	req, err := http.NewRequest("GET", ur, nil)
+	no(err)
+	req.Header.Set("User-Agent", args.u)
+	resp, err := http.DefaultClient.Do(req)
+	if args.v {
+		fmt.Print(Response{resp})
+	}
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer resp.Body.Close()
 	if _, err = io.Copy(out, resp.Body); err != nil {
-		log.Fatalln(err)
+		log.Println(err)
 	}
 }
 
@@ -63,6 +93,7 @@ func init() {
 	f.BoolVar(&args.h, "h", false, "")
 	f.BoolVar(&args.q, "?", false, "")
 	f.BoolVar(&args.a, "a", false, "")
+	f.StringVar(&args.u, "u", "Mozilla/5.0", "")
 	err := mute.Parse(f, os.Args[1:])
 	if err != nil {
 		printerr(err)
@@ -82,19 +113,21 @@ DESCRIPTION
 
 	Options:
 	-a    auto name file and save to current directory
+	-u    user agent
 	-v    verbose, print response headers to stderr
 
 EXAMPLE
-	hget https://downover.io > downover.html
+	hget http://example.com
 
 `)
 }
 
-type Response struct{
+type Response struct {
 	*http.Response
 }
-func (r Response) String() string{
-	if r.Response == nil{
+
+func (r Response) String() string {
+	if r.Response == nil {
 		return "<nil>"
 	}
 	return fmt.Sprintf("%s Status: %s\n%s\n", r.Proto, r.Status, r.Header)
