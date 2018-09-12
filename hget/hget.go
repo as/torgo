@@ -20,31 +20,31 @@ var args struct {
 	h, q bool
 	v    bool
 	a    bool
-	u string
-	f bool
+	u    string
+	f    bool
 }
 var f *flag.FlagSet
 
 func main() {
 	out := io.Writer(os.Stdout)
-	if args.u == ""{
+	if args.u == "" {
 		args.u = "Mozilla/5.0"
 	}
 	if args.h || args.q {
 		usage()
 		os.Exit(0)
 	}
-	if len(f.Args()) == 0{
+	if len(f.Args()) == 0 {
 		os.Exit(1)
 	}
 	arg := f.Args()[0]
 	if arg == "-" {
 		sc := bufio.NewScanner(os.Stdin)
 		for sc.Scan() {
-			doget(out,sc.Text())
+			doget(out, sc.Text())
 		}
 	} else {
-		doget(out,arg)
+		doget(out, arg)
 	}
 }
 
