@@ -34,7 +34,8 @@ type ec chan error
 
 var (
 	limit = flag.Int("l", -1, "limit num pages processed")
-	dir   = flag.String("d", "./", "storage directory")
+	dir   = flag.String("d", "./", "storage directory (disabled) ")
+	ua = flag.String("ua", "Mozilla Firefox Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:53.0) Gecko/20100101 Firefox/53.0.", "user agent string")
 )
 
 var (
@@ -80,11 +81,12 @@ func store(done chan bool) {
 			}
 			u, _ := url.Parse(page.Origin)
 			fp := filepath.Join(*dir, filepath.Join(u.Host, u.Path))
-			if strings.HasPrefix(fp, *dir) {
+			if !strings.HasPrefix(fp, *dir) {
 				store2.ck("store", fmt.Errorf("bad/malicious file name: %q", fp))
 				continue
 			}
-			ioutil.WriteFile(fp, page.Body, 0600)
+			log.Println("FILE: ", fp)
+			//ioutil.WriteFile(fp, page.Body, 0600)
 		}
 	}
 
@@ -177,6 +179,14 @@ func get(done chan bool) {
 	c := http.Client{
 		Timeout: time.Second * 5,
 	}
+	httpget := func(u string) (*http.Response, error){
+		r, err := http.NewRequest("GET", u, nil)
+		if err != nil{
+			return nil, err
+		}
+		r.Header.Add("User-Agent", *ua)
+		return c.Do(r)
+	}
 	tick := mktick()
 	hasher := &Hasher{}
 	defer log.Println("FIN: get(exit)")
@@ -207,7 +217,7 @@ func get(done chan bool) {
 			}
 
 			b := []byte{}
-			resp, err := c.Get(uri)
+			resp, err := httpget(uri)
 			if !get2.ck("get", err) {
 				continue
 			}
@@ -252,9 +262,11 @@ var hostallowed = map[string]bool{}
 
 func main() {
 	flag.Parse()
+	*dir = filepath.Clean(*dir)
 	done := make(chan bool)
 	go get(done)
 	go link(done)
+	// go store(done)
 	go func() {
 		tick := mktick()
 		defer close(link0)
@@ -274,7 +286,6 @@ func main() {
 			Transmit:
 				select {
 				case link0 <- page:
-					store0 <- page
 				case <-tick:
 					println("INF: cant link0<-page (no consumers)")
 					goto Transmit
