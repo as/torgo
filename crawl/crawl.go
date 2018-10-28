@@ -333,16 +333,16 @@ func main() {
 	first := flag.Args()[0]
 	if first == "-" {
 		sc := bufio.NewScanner(os.Stdin)
-		go func(){
-		for sc.Scan() {
-			_, err := url.Parse(sc.Text())
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			get0 <- sc.Text()
+		go func() {
+			for sc.Scan() {
+				_, err := url.Parse(sc.Text())
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				get0 <- sc.Text()
 
-		}
+			}
 		}()
 	} else {
 		firsturl, err = url.Parse(first)
@@ -364,8 +364,6 @@ func main() {
 			}
 		}
 	}()
-
-
 
 Loop:
 	for {
