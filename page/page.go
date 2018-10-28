@@ -58,26 +58,6 @@ func readimage(path string) (image.Image, error) {
 func process(img image.Image, path string) (image.Image, error) {
 
 	r := img.Bounds()
-	//	if r.Max.X > winSize.X || r.Max.Y > winSize.Y-35 {
-	//r = img.Bounds()
-	//pt := winSize
-	//if float64(r.Dx())/float64(winSize.X) > float64(r.Dy())/float64(winSize.Y) {
-	//		pt.Y = 1
-	//	} else {
-	//		pt.X = 1
-	//	}
-	//	s := image.Rectangle{image.ZP, pt}
-	//	s.Max = pt.Mod(s)
-	//	img = Scale(img, s)
-	//	} else {
-	// 10x5 100x100
-	// get min x/w or y/h
-	// 	dy = h/y = 100/5 = 20
-	// 	dx = w/x = 100/10 = 10
-	// min is dx
-	// so the best we can do is 10x
-	//
-	// scale 10x5 to 100x50
 	wx := float64(winSize.X)
 	wy := float64(winSize.Y)
 	min := func(a, b float64) float64 {
@@ -86,7 +66,6 @@ func process(img image.Image, path string) (image.Image, error) {
 		}
 		return b
 	}
-	log.Println("winsize", winSize)
 	dx := wx / float64(r.Dx())
 	dy := wy / float64(r.Dy())
 	fact := min(dx, dy)
