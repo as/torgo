@@ -5,11 +5,15 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/as/mute"
 )
@@ -25,10 +29,26 @@ var args struct {
 }
 var f *flag.FlagSet
 
+type Page struct {
+	URL  string
+	Body []byte
+	err  error
+}
+
+func (p *Page) Filename() string {
+	u, err := url.Parse(p.URL)
+	if err != nil {
+		p.err = err
+		return ""
+	}
+	_, file := filepath.Split(u.Path)
+	return filepath.Clean(file)
+}
+
 func main() {
 	out := io.Writer(os.Stdout)
 	if args.u == "" {
-		args.u = "Mozilla/5.0"
+		args.u = "hget"
 	}
 	if args.h || args.q {
 		usage()
@@ -39,12 +59,150 @@ func main() {
 	}
 	arg := f.Args()[0]
 	if arg == "-" {
-		sc := bufio.NewScanner(os.Stdin)
-		for sc.Scan() {
-			doget(out, sc.Text())
+		cwd, err := os.Getwd()
+		if err != nil {
+			log.Fatal(err)
 		}
+		cwd, err = filepath.Abs(cwd)
+		if err != nil {
+			log.Fatal(err)
+		}
+		getc := make(chan *Page)
+		putc := make(chan *Page)
+		finc := make(chan *Page)
+		for i := 0; i < 4; i++ {
+			c := client{
+				ua: args.u,
+				Client: &http.Client{
+					Timeout: time.Second * 5,
+				},
+				in:  getc,
+				out: putc,
+				err: finc,
+			}
+			s := store{
+				base: cwd,
+				in:   putc,
+				err:  finc,
+			}
+			go c.run()
+			go s.run()
+		}
+		sc := bufio.NewScanner(os.Stdin)
+		n := 0
+
+		for sc.Scan() {
+			select {
+			case getc <- &Page{URL: sc.Text()}:
+				n++
+			case p := <-finc:
+				println(p.URL)
+				n--
+				if p.err != nil {
+					log.Println(p.err)
+				}
+			}
+
+		}
+		for n > 0 {
+			<-finc
+		}
+		close(getc)
 	} else {
 		doget(out, arg)
+	}
+}
+
+func ok(ctx string, err error) bool {
+	if err != nil {
+		log.Printf("%s: %v", ctx, err)
+		return false
+	}
+	return true
+}
+
+type client struct {
+	*http.Client
+	ua  string
+	in  <-chan *Page
+	out chan<- *Page
+	err chan<- *Page
+}
+
+func (c *client) ok(p *Page, err error) bool {
+	if err != nil {
+		p.err = err
+		c.err <- p
+		return false
+	}
+	return true
+}
+
+func (c *client) get(p *Page) bool {
+	rq, err := http.NewRequest("GET", p.URL, nil)
+	if !c.ok(p, err) {
+		return false
+	}
+	rq.Header.Set("User-Agent", c.ua)
+	resp, err := c.Do(rq)
+	if !c.ok(p, err) {
+		return false
+	}
+	defer resp.Body.Close()
+	b, err := ioutil.ReadAll(resp.Body)
+	p.Body = b
+	return c.ok(p, err)
+
+}
+
+func (c *client) run() {
+	defer close(c.out)
+	for {
+		select {
+		case p, more := <-c.in:
+			if !more {
+				return
+			}
+			if c.get(p) {
+				c.out <- p
+			}
+		}
+	}
+}
+
+type store struct {
+	base string
+	in   <-chan *Page
+	err  chan<- *Page
+}
+
+func (s *store) Safepath(name string) (string, error) {
+	name = filepath.Clean(filepath.Join(s.base, name))
+	if !strings.HasPrefix(name, s.base) {
+		return "", fmt.Errorf("bad file path: %q: missing base: %q", name, s.base)
+	}
+	if _, err := os.Stat(name); err == nil {
+		return "", fmt.Errorf("existing file: %q", name)
+	}
+	return name, nil
+}
+
+func (s *store) run() {
+	for {
+		select {
+		case p, more := <-s.in:
+			if !more {
+				return
+			}
+			file := ""
+			file, p.err = s.Safepath(p.Filename())
+			if p.err == nil {
+				println("write file", file)
+				p.err = ioutil.WriteFile(file, p.Body, 0600)
+			}
+			s.err <- p
+		}
+
 	}
 }
 
