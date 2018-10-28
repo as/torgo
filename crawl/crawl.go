@@ -28,18 +28,28 @@ func init() {
 	log.SetPrefix("crawl: ")
 }
 
-var absurl = regexp.MustCompile(`^[a-z]+://`)
+var match *regexp.Regexp
+var archive *regexp.Regexp
 
 type ec chan error
 
 var (
-	limit = flag.Int("l", -1, "limit num pages processed")
-	dir   = flag.String("d", "./", "storage directory (disabled) ")
-	ua = flag.String("ua", "Mozilla Firefox Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:53.0) Gecko/20100101 Firefox/53.0.", "user agent string")
+	limit   = flag.Int("l", -1, "limit num pages processed")
+	dir     = flag.String("d", "./", "storage directory (disabled) ")
+	ua      = flag.String("ua", "Mozilla Firefox Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:53.0) Gecko/20100101 Firefox/53.0.", "user agent string")
+	re      = flag.String("re", ".", "regular expression filter")
+	tags    = flag.String("tag", "href,content", "link detection elements")
+	host    = flag.String("host", "", "whitelist comma seperated hosts")
+	dynhost = flag.Int("dyn", 10, "allow up d encountered hosts (first come first serve)")
 )
 
+type getter struct {
+	fd0 chan string
+	fd1 chan Page
+	fd2 ec
+}
+
 var (
-	Maxhosts               = 3
 	in                     = make(chan [][]byte, 1024)
 	get0, get1, get2       = make(chan string, 128), make(chan Page, 128), make(ec, 128)
 	link0, link1, link2    = make(chan Page, 128), make(chan [][]byte, 128), make(ec, 128)
@@ -86,7 +96,7 @@ func store(done chan bool) {
 				continue
 			}
 			log.Println("FILE: ", fp)
-			//ioutil.WriteFile(fp, page.Body, 0600)
+			ioutil.WriteFile(fp, page.Body, 0600)
 		}
 	}
 
@@ -96,9 +106,9 @@ func link(done chan bool) {
 	origin := &url.URL{}
 	var f func(*html.Node)
 	f = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "a" {
+		if n.Type == html.ElementNode { //&& n.Data == "a" {
 			for _, a := range n.Attr {
-				if a.Key == "href" {
+				if tagmap[a.Key] {
 					u, err := url.Parse(a.Val)
 					if err != nil {
 						break
@@ -175,13 +185,16 @@ func (h *Hasher) Seen() bool {
 	return h.filter.seen(h.Sum(nil))
 }
 
-func get(done chan bool) {
+func (g getter) get(done chan bool) {
+	get0 := g.fd0
+	get1 := g.fd1
+	get2 := g.fd2
 	c := http.Client{
 		Timeout: time.Second * 5,
 	}
-	httpget := func(u string) (*http.Response, error){
+	httpget := func(u string) (*http.Response, error) {
 		r, err := http.NewRequest("GET", u, nil)
-		if err != nil{
+		if err != nil {
 			return nil, err
 		}
 		r.Header.Add("User-Agent", *ua)
@@ -207,7 +220,7 @@ func get(done chan bool) {
 				continue
 			}
 			if !hostallowed[url0.Host] {
-				if len(hostallowed) < Maxhosts {
+				if len(hostallowed) < *dynhost {
 					hostallowed[url0.Host] = true
 					log.Println("adding host:", url0.Host)
 				} else {
@@ -241,7 +254,7 @@ func get(done chan bool) {
 }
 
 func mktick() <-chan time.Time {
-	return time.NewTicker(time.Second * 5).C
+	return time.NewTicker(time.Second * 15).C
 }
 
 type filter map[string]struct{}
@@ -259,12 +272,29 @@ var urlfilter = filter{}
 
 var firsturl *url.URL
 var hostallowed = map[string]bool{}
+var tagmap = map[string]bool{}
 
 func main() {
 	flag.Parse()
+	if *re != "." {
+		match = regexp.MustCompile(*re)
+	}
+	for _, v := range strings.Split(*tags, ",") {
+		tagmap[v] = true
+	}
+	for _, v := range strings.Split(*host, ",") {
+		hostallowed[v] = true
+	}
 	*dir = filepath.Clean(*dir)
 	done := make(chan bool)
-	go get(done)
+	go getter{get0, get1, get2}.get(done)
+
+	//	s0, s1, s2 := make(chan string), make(chan Page), make(ec)
+	//	for i := 0; i < 4; i++{
+	//		go getter(s0,s1,s2).get(done)
+	//		go getter(s0,s1,s2).get(done)
+	//
+	//	}
 	go link(done)
 	// go store(done)
 	go func() {
@@ -281,8 +311,6 @@ func main() {
 				if !more {
 					return
 				}
-				log.Println("pipe", len(page.Body))
-
 			Transmit:
 				select {
 				case link0 <- page:
@@ -347,7 +375,7 @@ Loop:
 			*limit--
 			n--
 			for i, u := range url {
-				if !urlfilter.seen(u) {
+				if !urlfilter.seen(u) && (match == nil || match.Match(u)) {
 					n++
 					fmt.Println(string(u))
 				} else {
