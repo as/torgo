@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/md5"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -329,15 +331,29 @@ func main() {
 
 	var err error
 	first := flag.Args()[0]
-	firsturl, err = url.Parse(first)
-	if err != nil {
-		log.Fatal(err)
-	}
-	hostallowed[firsturl.Host] = true
-	get0 <- first
-	urlfilter.seen([]byte(first))
-	tick := mktick()
+	if first == "-" {
+		sc := bufio.NewScanner(os.Stdin)
+		go func(){
+		for sc.Scan() {
+			_, err := url.Parse(sc.Text())
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			get0 <- sc.Text()
 
+		}
+		}()
+	} else {
+		firsturl, err = url.Parse(first)
+		hostallowed[firsturl.Host] = true
+		if err != nil {
+			log.Fatal(err)
+		}
+		get0 <- first
+		urlfilter.seen([]byte(first))
+	}
+	tick := mktick()
 	go func() {
 		for url := range in {
 			for _, url := range url {
@@ -348,6 +364,8 @@ func main() {
 			}
 		}
 	}()
+
+
 
 Loop:
 	for {
