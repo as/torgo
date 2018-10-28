@@ -4,15 +4,14 @@ import (
 	//	"github.com/as/clip"
 	//"golang.org/x/image/font"
 	"bufio"
-	"fmt"
-	"github.com/as/font"
 	"image"
 	"image/color"
 	"image/draw"
 	"log"
 	"os"
+	"sync/atomic"
 
-	"github.com/as/cursor"
+	"github.com/as/font"
 
 	"github.com/as/frame"
 	draw2 "golang.org/x/image/draw"
@@ -37,7 +36,7 @@ var Red = image.NewUniform(color.RGBA{255, 0, 0, 255})
 var EggShell = image.NewUniform(color.RGBA{128, 128, 128, 33})
 var winSize = image.Pt(1920, 1080)
 
-var kern = draw2.Interpolator(draw2.CatmullRom)
+var kern = draw2.Interpolator(draw2.ApproxBiLinear)
 
 func Scale(img image.Image, r image.Rectangle) draw.Image {
 	dst := image.NewRGBA(r)
@@ -57,14 +56,50 @@ func readimage(path string) (image.Image, error) {
 	return process(img, path)
 }
 func process(img image.Image, path string) (image.Image, error) {
+
 	r := img.Bounds()
-	if r.Max.X > winSize.X || r.Max.Y > winSize.Y-35 {
-		img = Scale(img, image.Rectangle{image.ZP, image.Pt(winSize.X, winSize.Y-35)})
+	//	if r.Max.X > winSize.X || r.Max.Y > winSize.Y-35 {
+	//r = img.Bounds()
+	//pt := winSize
+	//if float64(r.Dx())/float64(winSize.X) > float64(r.Dy())/float64(winSize.Y) {
+	//		pt.Y = 1
+	//	} else {
+	//		pt.X = 1
+	//	}
+	//	s := image.Rectangle{image.ZP, pt}
+	//	s.Max = pt.Mod(s)
+	//	img = Scale(img, s)
+	//	} else {
+	// 10x5 100x100
+	// get min x/w or y/h
+	// 	dy = h/y = 100/5 = 20
+	// 	dx = w/x = 100/10 = 10
+	// min is dx
+	// so the best we can do is 10x
+	//
+	// scale 10x5 to 100x50
+	wx := float64(winSize.X)
+	wy := float64(winSize.Y)
+	min := func(a, b float64) float64 {
+		if a < b {
+			return a
+		}
+		return b
 	}
-	switch img := img.(type) {
-	case draw.Image:
-		fr.Insert([]byte(path+"\n\n"), 0)
-		draw.Draw(img, img.Bounds(), bitmap, bitmap.Bounds().Min, draw.Src)
+	log.Println("winsize", winSize)
+	dx := wx / float64(r.Dx())
+	dy := wy / float64(r.Dy())
+	fact := min(dx, dy)
+	r.Max.X = int(float64(r.Max.X) * fact)
+	r.Max.Y = int(float64(r.Max.Y) * fact)
+	log.Printf("scale %s to %s\n", img.Bounds(), r)
+	img = Scale(img, r)
+	if false {
+		switch img := img.(type) {
+		case draw.Image:
+			fr.Insert([]byte(path+"\n\n"), 0)
+			draw.Draw(img, img.Bounds(), bitmap, bitmap.Bounds().Min, draw.Src)
+		}
 	}
 	return img, nil
 }
@@ -73,6 +108,14 @@ var bitmap = image.NewRGBA(image.Rect(0, winSize.Y-35, winSize.X, winSize.Y))
 var fr = frame.New(bitmap, bitmap.Bounds(), &frame.Config{Face: font.NewGoMono(15), Color: frame.Acme})
 
 func main() {
+	var (
+		ring [1024 * 1024 * 4]string
+		N    = int64(len(ring))
+		cur  int64
+		hi   int64
+	)
+
+	doit := make(chan image.Image, 100)
 	driver.Main(func(src screen.Screen) {
 		win, _ := src.NewWindow(&screen.NewWindowOptions{winSize.X, winSize.Y, "page"})
 		focused := false
@@ -83,12 +126,8 @@ func main() {
 			if len(a) > 1 && a[len(a)-1] == "-" {
 				sc := bufio.NewScanner(bufio.NewReader(os.Stdin))
 				for sc.Scan() {
-					img, err := readimage(sc.Text())
-					if err != nil {
-						log.Println(err)
-						continue
-					}
-					win.Send(img)
+					i := atomic.AddInt64(&hi, 1)
+					ring[i%N] = sc.Text()
 				}
 			} else {
 				fd := bufio.NewReader(os.Stdin)
@@ -103,60 +142,78 @@ func main() {
 					}
 					size0 := image.Pt(img.Bounds().Dx(), img.Bounds().Dy())
 					if size0 != size {
-						win.Send(size0)
 						size = size0
 					}
-					win.Send(Scale(img, image.Rectangle{image.ZP, winSize}))
+					doit <- (Scale(img, image.Rectangle{image.ZP, winSize}))
 				}
 			}
 		}()
-		dirty := true
-		outp := winSize
 		for {
 			switch e := win.NextEvent().(type) {
-			case image.Point:
-				outp = e
 			case image.Image:
-				//log.Println("image")
-				draw.Draw(buf.RGBA(), e.Bounds(), e, e.Bounds().Min, draw.Src)
-				dirty = true
-				win.Send(paint.Event{})
 			case key.Event:
-				//log.Println("kbd")
-				//fmt.Printf("%#v\n", e)
+				const HIDE = 128
+				di := int64(0)
+				hi := int64(0)
+				i := int64(0)
+				switch e.Code {
+				case key.CodeSpacebar:
+					draw.Draw(buf.RGBA(), buf.Bounds(), image.Black, image.ZP, draw.Src)
+					win.SendFirst(paint.Event{})
+					continue
+				case key.CodeLeftArrow:
+					di = -1
+				case key.CodeRightArrow:
+					di = 1
+				case key.CodeUpArrow:
+					di = 10
+				case key.CodeDownArrow:
+					di = -10
+				}
+				if di == 0 || e.Direction == key.DirRelease {
+					continue
+				}
+
+				tries := 15
+			AGAIN:
+				i = atomic.AddInt64(&cur, di)
+				if i < 0 {
+					i = N - i
+				}
+				hi = atomic.LoadInt64(&hi)
+				if hi == 0 {
+					i = 0
+				} else {
+					i = i % hi % N
+				}
+
+				print("read", i, ring[i])
+				src, err := readimage(ring[i])
+				if err != nil {
+					println(err.Error())
+					if tries != 0 {
+						tries--
+						goto AGAIN
+					}
+					continue
+				} else {
+					println("ok")
+				}
+
+				draw.Draw(buf.RGBA(), buf.Bounds(), src, src.Bounds().Min, draw.Src)
+				win.Send(paint.Event{})
 			case mouse.Event:
-				//log.Println("mouse")
-				x0, y0 := e.X, e.Y
-				//x := int(x0*(float32(winSize.X)/float32(outp.X)))
-				//y := int(y0*(float32(winSize.Y)/float32(outp.Y)))
-				x := int(x0 * (float32(outp.X) / float32(winSize.X)))
-				y := int(y0 * (float32(outp.Y) / float32(winSize.Y)))
-				//log.Printf("local: (%d,%d) remote: (%d,%d)\n", int(x0), int(y0), x, y)
-				btn := int(e.Button)
-				if e.Direction == 0 {
-					btn = 1
-				}
-				if e.Direction == 1 && e.Button == 1 {
-					btn = 2
-				}
-				if e.Direction == 2 && e.Button == 1 {
-					btn = 4
-				}
-				v := cursor.WriteString(x, y, btn, 0)
-				log.Println("send", v)
-				fmt.Println(v)
-				//drawBorder(buf.RGBA(), image.Rect(0, 0, 4, 4).Add(image.Pt(int(e.X), int(e.Y))), Red, image.ZP, 1)
 			case size.Event:
-				//log.Println("size")
 				winSize = e.Size()
-				dirty = true
+				buf0, _ := src.NewBuffer(winSize)
+				draw.Draw(buf0.RGBA(), buf0.Bounds(), buf.RGBA(), buf.RGBA().Bounds().Min, draw.Src)
+				buf.Release()
+				buf = buf0
+				win.Send(paint.Event{})
 			case paint.Event:
-				//log.Println("paint")
-				if dirty {
-					win.Upload(buf.Bounds().Min, buf, buf.Bounds())
-					win.Publish()
-					dirty = false
-				}
+				win.Fill(buf.Bounds(), image.Black, draw.Src)
+				win.Upload(buf.Bounds().Min, buf, buf.Bounds())
+				win.Publish()
 			case lifecycle.Event:
 				if e.To == lifecycle.StageDead {
 					return
@@ -167,6 +224,7 @@ func main() {
 				} else if e.Crosses(lifecycle.StageFocused) == lifecycle.CrossOn {
 					focused = true
 				}
+			case interface{}:
 			}
 		}
 	})
