@@ -27,16 +27,17 @@ var (
 	delay = flag.Duration("delay", time.Second/100, "delay between frames")
 )
 
+var (
+	kern = draw.CatmullRom
+	fr *image.Paletted
+	ctr = 1
+)
+
 func init() {
 	flag.Parse()
 }
 
-var kern = draw.CatmullRom
-
 type Conv chan *image.Paletted
-
-var fr *image.Paletted
-var ctr = 1
 
 func Convert(img image.Image) Conv {
 	kern = nil
