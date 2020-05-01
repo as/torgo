@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
@@ -14,23 +15,25 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/as/mute"
 )
 
 const Prefix = "hget: "
 
-var args struct {
-	h, q bool
-	v    bool
-	a    bool
-	u    string
-	f    bool
-}
-var f *flag.FlagSet
+var (
+	h1, h2   = flag.Bool("h", false, "show help"), flag.Bool("?", false, "show help")
+	verb     = flag.Bool("v", false, "verbose")
+	auto     = flag.Bool("a", false, "auto save file (no pipe)")
+	ua       = flag.String("ua", "hget", "user agent")
+	force    = flag.Bool("f", false, "overwrite existing files (if using -a)")
+	method   = flag.String("X", "GET", "request method")
+	header   = flag.String("H", "", "request headers")
+	data     = flag.String("d", "", "request data")
+	nofollow = flag.Bool("nofollow", false, "dont follow redirects")
+)
 
 type Page struct {
-	URL  string
+	URL string
+	http.Header
 	Body []byte
 	err  error
 }
@@ -45,19 +48,33 @@ func (p *Page) Filename() string {
 	return filepath.Clean(file)
 }
 
+var (
+	getc = make(chan *Page)
+	putc = make(chan *Page)
+	finc = make(chan *Page)
+)
+
+func init() {
+
+}
+
 func main() {
 	out := io.Writer(os.Stdout)
-	if args.u == "" {
-		args.u = "hget"
+	if *ua == "" {
+		*ua = "hget"
 	}
-	if args.h || args.q {
+	if *h1 || *h2 {
 		usage()
 		os.Exit(0)
 	}
-	if len(f.Args()) == 0 {
+	if !*nofollow {
+		ckredirect = nil
+	}
+	args := flag.Args()
+	if len(args) == 0 {
 		os.Exit(1)
 	}
-	arg := f.Args()[0]
+	arg := args[0]
 	if arg == "-" {
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -72,9 +89,10 @@ func main() {
 		finc := make(chan *Page)
 		for i := 0; i < 4; i++ {
 			c := client{
-				ua: args.u,
+				ua: *ua,
 				Client: &http.Client{
-					Timeout: time.Second * 5,
+					Timeout:       time.Second * 5,
+					CheckRedirect: ckredirect,
 				},
 				in:  getc,
 				out: putc,
@@ -96,7 +114,6 @@ func main() {
 			case getc <- &Page{URL: sc.Text()}:
 				n++
 			case p := <-finc:
-				println(p.URL)
 				n--
 				if p.err != nil {
 					log.Println(p.err)
@@ -138,19 +155,40 @@ func (c *client) ok(p *Page, err error) bool {
 	return true
 }
 
-func (c *client) get(p *Page) bool {
-	rq, err := http.NewRequest("GET", p.URL, nil)
+func (c *client) do(m string, p *Page, head ...string) bool {
+	if *verb {
+		log.Printf("do: %s %s", m, p.URL)
+	}
+	rq, err := http.NewRequest(m, p.URL, nil)
 	if !c.ok(p, err) {
 		return false
 	}
 	rq.Header.Set("User-Agent", c.ua)
+	var k string
+	for i, v := range head[:len(head)-len(head)%2] {
+		if i%2 == 0 {
+			k = v
+		} else {
+			rq.Header.Set(k, v)
+		}
+	}
+	if p.Body != nil {
+		rq.ContentLength = int64(len(p.Body))
+		rq.Body = ioutil.NopCloser(bytes.NewReader(p.Body))
+	}
+
 	resp, err := c.Do(rq)
 	if !c.ok(p, err) {
+		p.Body = nil
 		return false
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	p.Body = b
+	p.Header = resp.Header
+	if *verb {
+		log.Printf("reply: %+v", resp)
+	}
 	return c.ok(p, err)
 
 }
@@ -163,7 +201,7 @@ func (c *client) run() {
 			if !more {
 				return
 			}
-			if c.get(p) {
+			if c.do("GET", p) {
 				c.out <- p
 			}
 		}
@@ -197,7 +235,7 @@ func (s *store) run() {
 			file := ""
 			file, p.err = s.Safepath(p.Filename())
 			if p.err == nil {
-				println("write file", file)
+				log.Println("write file", file)
 				p.err = ioutil.WriteFile(file, p.Body, 0600)
 			}
 			s.err <- p
@@ -206,11 +244,17 @@ func (s *store) run() {
 	}
 }
 
+var ckredirect = noredirects
+var noredirects = func(req *http.Request, via []*http.Request) error {
+	log.Println("not following")
+	return http.ErrUseLastResponse
+}
+
 func doget(out io.Writer, ur string) {
-	if args.a {
+	if *auto {
 		u, err := url.Parse(ur)
 		_, file := path.Split(u.Path)
-		if args.f {
+		if *force {
 			_, err := os.Stat(file)
 			if err != nil {
 				log.Println("skip file", file)
@@ -222,19 +266,47 @@ func doget(out io.Writer, ur string) {
 		defer fd.Close()
 		out = fd
 	}
-	req, err := http.NewRequest("GET", ur, nil)
-	no(err)
-	req.Header.Set("User-Agent", args.u)
-	resp, err := http.DefaultClient.Do(req)
-	if args.v {
-		fmt.Print(Response{resp})
+
+	getc = make(chan *Page, 10)
+	putc = make(chan *Page, 10)
+	finc = make(chan *Page, 10)
+	c := &client{
+		Client: &http.Client{
+			CheckRedirect: ckredirect,
+			Timeout:       time.Second * 5,
+		},
+		ua:  *ua,
+		in:  getc,
+		out: putc,
+		err: finc,
+	}
+	hdr := strings.Split(*header, `,`)
+	hdr0 := []string{}
+	for _, v := range hdr {
+		for _, v := range strings.Split(v, ": ") {
+			hdr0 = append(hdr0, strings.TrimSpace(v))
+		}
+	}
+	pg := &Page{URL: ur}
+	var err error
+	buf := []byte(*data)
+	if *verb {
+		log.Printf("body: %q\n", *data)
+	}
+	if *data == "-" {
+		buf, err = ioutil.ReadAll(os.Stdin)
+		no(err)
+	}
+	pg.Body = buf
+	c.do(*method, pg, hdr0...)
+	if *verb {
+		log.Println(pg.Header)
 	}
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	defer resp.Body.Close()
-	if _, err = io.Copy(out, resp.Body); err != nil {
+	if _, err = io.Copy(out, bytes.NewReader(pg.Body)); err != nil {
 		log.Println(err)
 	}
 }
@@ -246,16 +318,10 @@ func no(err error) {
 }
 
 func init() {
-	f = flag.NewFlagSet("main", flag.ContinueOnError)
-	f.BoolVar(&args.v, "v", false, "")
-	f.BoolVar(&args.h, "h", false, "")
-	f.BoolVar(&args.q, "?", false, "")
-	f.BoolVar(&args.a, "a", false, "")
-	f.StringVar(&args.u, "u", "Mozilla/5.0", "")
-	err := mute.Parse(f, os.Args[1:])
-	if err != nil {
-		printerr(err)
-		os.Exit(1)
+	flag.Parse()
+	if *h1 || *h2 {
+		usage()
+		os.Exit(0)
 	}
 }
 func usage() {
@@ -289,14 +355,4 @@ func (r Response) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("%s Status: %s\n%s\n", r.Proto, r.Status, r.Header)
-}
-
-func println(v ...interface{}) {
-	fmt.Print(Prefix)
-	fmt.Println(v...)
-}
-
-func printerr(v ...interface{}) {
-	fmt.Fprint(os.Stderr, Prefix)
-	fmt.Fprintln(os.Stderr, v...)
 }
