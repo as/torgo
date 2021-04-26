@@ -9,10 +9,10 @@ package main
 */
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
@@ -166,12 +166,19 @@ func main() {
 		usage()
 		os.Exit(0)
 	case args.f != "":
-		data, err := ioutil.ReadFile(args.f)
+		re := "("
+		sep := ""
+		fd, err := os.Open(args.f)
 		if err != nil {
-			//printerr(err)
 			os.Exit(1)
 		}
-		re = string(data)
+		defer fd.Close()
+		sc := bufio.NewScanner(fd)
+		for sc.Scan() {
+			re += sep + sc.Text()
+			sep = "|"
+		}
+		re += ")"
 	case nargs < 1:
 		usage()
 		os.Exit(1)
