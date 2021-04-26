@@ -166,7 +166,7 @@ func main() {
 		usage()
 		os.Exit(0)
 	case args.f != "":
-		re := "("
+		re = "("
 		sep := ""
 		fd, err := os.Open(args.f)
 		if err != nil {
