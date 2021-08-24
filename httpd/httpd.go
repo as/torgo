@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	dir  = flag.String("-d", ".", "directory to serve")
-	addr = flag.String("-a", ":8086", "address to listen on")
+	dir  = flag.String("d", ".", "directory to serve")
+	addr = flag.String("a", ":8086", "address to listen on")
 )
 
 func main() {
