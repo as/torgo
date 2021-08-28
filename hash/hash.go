@@ -11,45 +11,24 @@ import (
 	"hash"
 	"io"
 	"os"
-	"sync"
-)
+	"runtime"
 
-import (
-	"github.com/as/mute"
-)
-
-import (
 	"golang.org/x/crypto/md4"
 	"golang.org/x/crypto/ripemd160"
 	"golang.org/x/crypto/sha3"
 )
 
-const (
-	Prefix     = "hash: "
-	BufferSize = 2e16
-	Unset      = "‡"
+var (
+	help  = flag.Bool("h", false, "")
+	quest = flag.Bool("?", false, "")
+	quiet = flag.Bool("q", false, "")
+	bs    = flag.Bool("b", false, "")
+	csp   = flag.Int("csp", runtime.NumCPU(), "")
 )
 
-var args struct {
-	h, q bool
-	b    bool
-	stfu bool
-	csp  int
-}
-
-var f *flag.FlagSet
-
 func init() {
-	f = flag.NewFlagSet("main", flag.ContinueOnError)
-	f.BoolVar(&args.h, "h", false, "")
-	f.BoolVar(&args.q, "?", false, "")
-	f.BoolVar(&args.b, "b", false, "")
-	f.IntVar(&args.csp, "csp", 0, "")
-	err := mute.Parse(f, os.Args[1:])
-	if err != nil {
-		printerr(err)
-		os.Exit(1)
-	}
+	flag.Usage = usage
+	flag.Parse()
 }
 
 var std = map[string]func() hash.Hash{
@@ -66,136 +45,101 @@ var std = map[string]func() hash.Hash{
 	"sha3/512":  sha3.New512,
 }
 
-type Reader io.ReadCloser
-type File struct {
-	Reader
-	name *string
-	hash []byte
-}
-
 func main() {
-	a := f.Args()
+	a := flag.Args()
+	if *help || *quest {
+		usage()
+		os.Exit(0)
+	}
 	if len(a) == 0 {
 		usage()
 		os.Exit(1)
 	}
 	initfn, ok := std[a[0]]
 	if !ok {
-		printerr("no hash alg:", a[0])
+		fmt.Fprintf(os.Stderr, "no hash alg: %q", a[0])
 		os.Exit(1)
 	}
-	if args.b {
+	if *bs {
 		h := initfn()
 		fmt.Println(h.BlockSize())
 		os.Exit(0)
 	}
-	files := a[1:]
-	printfn := print2
-	if len(files) == 0 {
-		printfn = print1
+	file := a[1:]
+
+	n := *csp
+	in := make(chan work, n)
+	out := make(chan work, n)
+	done := make(chan int)
+
+	for i := 0; i < n; i++ {
+		go func() {
+			ha{Hash: initfn(), in: in, out: out, done: done}.run()
+		}()
 	}
-
-	in := make(chan File, args.csp)
-	out := make(chan File, args.csp)
-	go walker(in, files...)
-	go hasher(initfn, in, out)
-	printer(printfn, out)
-}
-
-func walker(to chan File, args ...string) {
-	if len(args) == 0 {
-		to <- File{Reader: os.Stdin}
-		close(to)
-		return
-	}
-
-	emitfd := func(n string) {
-		fd, err := os.Open(n)
-		if err != nil {
-			printerr(err)
-			fd.Close()
-		} else {
-			to <- File{name: &n, Reader: fd}
-		}
-	}
-
 	go func() {
-		for _, v := range args {
-			if v != "-" {
-				emitfd(v)
+		defer close(in)
+		if len(file) == 0 {
+			in <- work{file: ""}
+			return
+		}
+		for _, f := range file {
+			if f != "-" {
+				in <- work{file: f}
 			} else {
-				in := bufio.NewScanner(os.Stdin)
-				for in.Scan() {
-					emitfd(in.Text())
+				list := bufio.NewScanner(os.Stdin)
+				for list.Scan() {
+					in <- work{file: list.Text()}
 				}
 			}
 		}
-		close(to)
 	}()
-}
-
-func hasher(init func() hash.Hash, in, out chan File) {
-	var wg sync.WaitGroup
-	for f := range in {
-		wg.Add(1)
-		go func(f File) {
-			h := init()
-			io.Copy(h, f)
-			f.Close()
-			f.hash = h.Sum(nil)
-			out <- f
-			wg.Done()
-		}(f)
-	}
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-}
-
-func printer(fn func(f File), ch <-chan File) {
-	for h := range ch {
-		fn(h)
-	}
-}
-
-func print1(f File) {
-	fmt.Printf("%x\n", f.hash)
-}
-
-func print2(f File) {
-	fmt.Printf("%x	%s\n", f.hash, *f.name)
-}
-
-// Mux combines a slice of channels into one channel
-func mux(c ...chan File) chan File {
-	var wg sync.WaitGroup
-	out := make(chan File, len(c))
-	output := func(c <-chan File) {
-		for n := range c {
-			out <- n
+	for {
+		select {
+		case <-done:
+			n--
+		case w := <-out:
+			if *quiet || len(file) == 0 {
+				fmt.Printf("%x\n", w.hash)
+			} else {
+				fmt.Printf("%x	%s\n", w.hash, w.file)
+			}
 		}
-		wg.Done()
+		if n == 0 && len(out) == 0 {
+			break
+		}
 	}
-	wg.Add(len(c))
-	for _, v := range c {
-		go output(v)
-	}
-	go func() {
-		wg.Wait()
-		close(out)
+}
+
+type work struct {
+	file string
+	hash string
+}
+type ha struct {
+	hash.Hash
+	in   <-chan work
+	out  chan<- work
+	done chan<- int
+}
+
+func (h ha) run() {
+	defer func() {
+		h.done <- 1
 	}()
-	return out
-}
-
-func println(v ...interface{}) {
-	fmt.Print(Prefix)
-	fmt.Println(v...)
-}
-
-func printerr(v ...interface{}) {
-	fmt.Fprint(os.Stderr, Prefix)
-	fmt.Fprintln(os.Stderr, v...)
+	for w := range h.in {
+		h.Reset()
+		fd := os.Stdin
+		var err error
+		if w.file != "" {
+			if fd, err = os.Open(w.file); err != nil {
+				continue
+			}
+		}
+		io.Copy(h, fd)
+		fd.Close()
+		w.hash = string(h.Sum(nil))
+		h.out <- w
+	}
 }
 
 func usage() {
